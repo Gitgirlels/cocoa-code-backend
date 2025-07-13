@@ -26,6 +26,8 @@ sequelize.sync({ alter: true })
   .then(() => console.log('✅ All models synced'))
   .catch(err => console.error('❌ Sync failed:', err));
 
+
+  
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
