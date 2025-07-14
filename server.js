@@ -28,8 +28,8 @@ const corsOptions = {
     'http://127.0.0.1:5500',      // Live Server
     'http://localhost:5500',      // Live Server alt
     'file://', 
-    'https://gitgirlels.github.io/cocoa-code/',
-    'https://cocoa-code.netlify.app/',    // Local file access
+    'https://gitgirlels.github.io',
+    'https://cocoa-code.netlify.app',    // Local file access
     process.env.FRONTEND_URL      // Your production frontend URL
   ],
   credentials: true,
