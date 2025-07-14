@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Client = require('../models/Client');  // You'll create this next
-const Project = require('../models/Project'); // You'll create this next
+const { Project, Client } = require('../models');
 
 
 // 📅 Check availability for a month

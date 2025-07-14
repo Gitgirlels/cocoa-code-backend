@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const Payment = require('../models/Payment');
-const Project = require('../models/Project');
+const { Payment, Project } = require('../models');
+
 
 // Create payment intent
 router.post('/create-intent', async (req, res) => {

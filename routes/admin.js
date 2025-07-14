@@ -1,9 +1,8 @@
 // routes/admin.js
 const express = require('express');
 const router = express.Router();
-const Project = require('../models/Project');
-const Client = require('../models/Client');
-const Payment = require('../models/Payment');
+const { Project, Client, Payment } = require('../models');
+
 
 // Get all projects
 router.get('/projects', async (req, res) => {
