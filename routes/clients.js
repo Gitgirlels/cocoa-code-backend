@@ -4,13 +4,15 @@ const { Client } = require('../models');
 
 // 🔹 Get all clients
 router.get('/', async (req, res) => {
-  try {
-    const clients = await Client.findAll({ order: [['createdAt', 'DESC']] });
-    res.json(clients);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+    try {
+      const clients = await Client.findAll({ order: [['createdAt', 'DESC']] });
+      res.json(clients);
+    } catch (error) {
+      console.error('GET /clients error:', error); // Add this line 👈
+      res.status(500).json({ error: error.message }); // So you can SEE the error
+    }
+  });
+  
 
 // 🔹 Get a single client by ID
 router.get('/:id', async (req, res) => {
