@@ -9,6 +9,11 @@ router.get('/availability/:month', async (req, res) => {
   try {
     const { month } = req.params;
 
+    console.log('📅 Requested bookingMonth:', month);
+    
+    const bookings = await Project.findAll({ attributes: ['bookingMonth'] });
+    console.log('📊 Current bookings in DB:', bookings.map(b => b.bookingMonth));
+
     const bookingCount = await Project.count({
       where: { bookingMonth: month }
     });
@@ -17,9 +22,11 @@ router.get('/availability/:month', async (req, res) => {
     res.json({ available: isAvailable, currentBookings: bookingCount });
 
   } catch (error) {
+    console.error('❌ Error checking availability:', error);
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // 📝 Create a booking
 router.post('/', async (req, res) => {

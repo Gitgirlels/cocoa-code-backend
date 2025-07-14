@@ -1,3 +1,4 @@
+const { body, validationResult } = require('express-validator');
 const express = require('express');
 const router = express.Router();
 const { Client } = require('../models');
@@ -26,27 +27,53 @@ router.get('/:id', async (req, res) => {
 });
 
 // 🔹 Create a new client
-router.post('/', async (req, res) => {
-  try {
-    const client = await Client.create(req.body);
-    res.status(201).json(client);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+router.post('/',
+  [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('phone').optional().isString().withMessage('Phone must be a string')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const client = await Client.create(req.body);
+      res.status(201).json(client);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
   }
-});
+);
+
 
 // 🔹 Update a client
-router.put('/:id', async (req, res) => {
-  try {
-    const [updated] = await Client.update(req.body, {
-      where: { id: req.params.id }
-    });
-    if (!updated) return res.status(404).json({ error: 'Client not found' });
-    res.json({ message: 'Client updated successfully' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+router.put('/:id',
+  [
+    body('name').optional().notEmpty().withMessage('Name cannot be empty'),
+    body('email').optional().isEmail().withMessage('Must be a valid email'),
+    body('phone').optional().isString().withMessage('Phone must be a string')
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const [updated] = await Client.update(req.body, {
+        where: { id: req.params.id }
+      });
+      if (!updated) return res.status(404).json({ error: 'Client not found' });
+      res.json({ message: 'Client updated successfully' });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
   }
-});
+);
+
 
 // 🔹 Delete a client
 router.delete('/:id', async (req, res) => {

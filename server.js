@@ -1,7 +1,6 @@
 require('dotenv').config(); // 🔼 at the top before anything else
 
 const rateLimit = require('express-rate-limit');
-
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
@@ -14,7 +13,11 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests
 });
 
+
 app.use(limiter);
+
+const helmet = require('helmet');
+app.use(helmet());
 
 app.use(cors());
 app.use(express.json());
@@ -25,6 +28,11 @@ app.use('/api/bookings', require('./routes/bookings'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/admin', require('./routes/admin'));
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 // Database check + sync
 sequelize.authenticate()
