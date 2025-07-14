@@ -1,5 +1,7 @@
 require('dotenv').config(); // 🔼 at the top before anything else
 
+const rateLimit = require('express-rate-limit');
+
 const express = require('express');
 const cors = require('cors');
 const { sequelize } = require('./models');
