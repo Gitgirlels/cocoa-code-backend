@@ -1,8 +1,8 @@
-import { Router } from 'express';
-const router = Router();
+// routes/payments.js
+const express = require('express');
+const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-import { Payment, Project } from '../models';
-
+const { Payment, Project } = require('../models');
 
 // Create payment intent
 router.post('/create-intent', async (req, res) => {
@@ -34,12 +34,12 @@ router.post('/create-intent', async (req, res) => {
 // Confirm payment
 router.post('/confirm', async (req, res) => {
     try {
-        const { projectId, paymentIntentId, paymentMethod } = req.body;
+        const { projectId, paymentIntentId, paymentMethod, amount } = req.body;
 
         // Create payment record
         const payment = await Payment.create({
             projectId,
-            amount: req.body.amount,
+            amount, // Use destructured amount instead of req.body.amount
             paymentMethod,
             paymentStatus: 'completed',
             stripePaymentId: paymentIntentId
@@ -57,4 +57,4 @@ router.post('/confirm', async (req, res) => {
     }
 });
 
-export default router;
+module.exports = router;
