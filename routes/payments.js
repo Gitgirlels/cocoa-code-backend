@@ -1,7 +1,7 @@
-const express = require('express');
-const router = express.Router();
+import { Router } from 'express';
+const router = Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { Payment, Project } = require('../models');
+import { Payment, Project } from '../models';
 
 
 // Create payment intent
@@ -57,4 +57,4 @@ router.post('/confirm', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
