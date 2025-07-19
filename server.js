@@ -93,7 +93,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       bookings: '/api/bookings',
-      availability: '/api/bookings/availability/:month'
+      availability: '/api/bookings/availability/:month',
+      payments: '/api/payments'
     }
   });
 });
@@ -141,6 +142,14 @@ try {
   console.error('❌ Error loading admin routes:', error.message);
 }
 
+// Add payments route with error handling
+try {
+  app.use('/api/payments', require('./routes/payments'));
+  console.log('✅ Payments routes loaded');
+} catch (error) {
+  console.error('❌ Error loading payments routes:', error.message);
+}
+
 // Fallback booking route if main routes fail
 app.post('/api/bookings', (req, res) => {
   console.log('📝 Fallback booking route hit');
@@ -174,7 +183,9 @@ app.use('*', (req, res) => {
       'GET /health',
       'GET /api/health',
       'POST /api/bookings',
-      'GET /api/bookings/availability/:month'
+      'GET /api/bookings/availability/:month',
+      'POST /api/payments/create-intent',
+      'POST /api/payments/confirm'
     ]
   });
 });
