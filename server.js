@@ -44,29 +44,7 @@ app.use(helmet({
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:5500',
-      'http://localhost:5500',
-      'https://gitgirlels.github.io',
-      'https://cocoa-code.netlify.app'
-    ];
-    
-    // Allow localhost, Railway, and known domains
-    if (origin.includes('localhost') || 
-        origin.includes('127.0.0.1') || 
-        origin.includes('railway.app') ||
-        origin.includes('netlify.app') ||
-        origin.includes('github.io') ||
-        allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    callback(null, true); // Allow all for development
+    callback(null, true); // Allow all for debugging
   },
   credentials: true,
   optionsSuccessStatus: 200
@@ -90,12 +68,7 @@ app.get('/', (req, res) => {
     message: '🍫 Welcome to Cocoa Code API!',
     status: 'running',
     timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/api/health',
-      bookings: '/api/bookings',
-      availability: '/api/bookings/availability/:month',
-      payments: '/api/payments'
-    }
+    mode: 'MINIMAL TEST MODE'
   });
 });
 
@@ -116,83 +89,63 @@ async function initializeDatabase() {
     dbInitialized = true;
   } catch (error) {
     console.error('❌ Database error:', error.message);
-    // Don't crash the app - let it run without DB for health checks
   }
 }
 
-// Routes - with error handling
+console.log('🧪 MINIMAL TEST MODE - Testing one route at a time');
+
+// TEST ONLY ONE ROUTE AT A TIME
+// Uncomment ONLY ONE route block to test
+
+// TEST 1: Bookings route
 try {
+  console.log('🧪 Testing bookings route...');
   app.use('/api/bookings', require('./routes/bookings'));
-  console.log('✅ Bookings routes loaded');
+  console.log('✅ Bookings routes loaded successfully');
 } catch (error) {
-  console.error('❌ Error loading bookings routes:', error.message);
+  console.error('❌ BOOKINGS ROUTE FAILED:', error.message);
+  console.error('❌ Stack:', error.stack);
 }
 
-try {
-  app.use('/api/clients', require('./routes/clients'));
-  console.log('✅ Clients routes loaded');
-} catch (error) {
-  console.error('❌ Error loading clients routes:', error.message);
-}
+// TEST 2: Clients route (COMMENT OUT BOOKINGS FIRST)
+// try {
+//   console.log('🧪 Testing clients route...');
+//   app.use('/api/clients', require('./routes/clients'));
+//   console.log('✅ Clients routes loaded successfully');
+// } catch (error) {
+//   console.error('❌ CLIENTS ROUTE FAILED:', error.message);
+//   console.error('❌ Stack:', error.stack);
+// }
 
-try {
-  app.use('/api/admin', require('./routes/admin'));
-  console.log('✅ Admin routes loaded');
-} catch (error) {
-  console.error('❌ Error loading admin routes:', error.message);
-}
+// TEST 3: Admin route (COMMENT OUT OTHERS FIRST)
+// try {
+//   console.log('🧪 Testing admin route...');
+//   app.use('/api/admin', require('./routes/admin'));
+//   console.log('✅ Admin routes loaded successfully');
+// } catch (error) {
+//   console.error('❌ ADMIN ROUTE FAILED:', error.message);
+//   console.error('❌ Stack:', error.stack);
+// }
 
-// Add payments route with error handling
-try {
-  app.use('/api/payments', require('./routes/payments'));
-  console.log('✅ Payments routes loaded');
-} catch (error) {
-  console.error('❌ Error loading payments routes:', error.message);
-}
-
-// Fallback booking route if main routes fail
-app.post('/api/bookings', (req, res) => {
-  console.log('📝 Fallback booking route hit');
-  res.json({
-    message: 'Booking received (fallback mode)',
-    projectId: 'fallback-' + Date.now(),
-    status: 'received'
-  });
-});
-
-app.get('/api/bookings/availability/:month', (req, res) => {
-  console.log('📅 Fallback availability check');
-  res.json({
-    available: true,
-    currentBookings: 0,
-    month: req.params.month,
-    maxBookings: 4,
-    mode: 'fallback'
-  });
+// Simple fallback routes
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Test route working!' });
 });
 
 // Catch-all for unknown routes
 app.use('*', (req, res) => {
-  console.log(`🤔 Unknown route: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     error: 'Route not found',
     path: req.originalUrl,
     method: req.method,
-    availableRoutes: [
-      'GET /',
-      'GET /health',
-      'GET /api/health',
-      'POST /api/bookings',
-      'GET /api/bookings/availability/:month',
-      'POST /api/payments/create-intent',
-      'POST /api/payments/confirm'
-    ]
+    mode: 'minimal-test'
   });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err.message);
+  console.error('❌ Server stack:', err.stack);
   res.status(500).json({
     error: 'Internal server error',
     message: err.message,
@@ -202,9 +155,9 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 MINIMAL TEST SERVER running on http://0.0.0.0:${PORT}`);
   console.log(`🔍 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🧪 Test endpoint: http://localhost:${PORT}/api/test`);
   
   // Initialize database after server starts
   initializeDatabase();
@@ -225,17 +178,6 @@ process.on('SIGINT', () => {
     console.log('✅ Server closed');
     process.exit(0);
   });
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error.message);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
-  process.exit(1);
 });
 
 module.exports = app;
