@@ -68,38 +68,15 @@ app.get('/', (req, res) => {
     message: '🍫 Welcome to Cocoa Code API!',
     status: 'running',
     timestamp: new Date().toISOString(),
-    mode: 'MINIMAL TEST MODE'
+    mode: 'BOOKINGS ONLY TEST'
   });
 });
 
-// Initialize database connection
-let dbInitialized = false;
+console.log('🧪 TESTING BOOKINGS ONLY - NO OTHER ROUTES');
 
-async function initializeDatabase() {
-  if (dbInitialized) return;
-  
-  try {
-    const { sequelize } = require('./models');
-    await sequelize.authenticate();
-    console.log('✅ Database connected');
-    
-    await sequelize.sync({ alter: false });
-    console.log('✅ Models synced');
-    
-    dbInitialized = true;
-  } catch (error) {
-    console.error('❌ Database error:', error.message);
-  }
-}
-
-console.log('🧪 MINIMAL TEST MODE - Testing one route at a time');
-
-// TEST ONLY ONE ROUTE AT A TIME
-// Uncomment ONLY ONE route block to test
-
-// TEST 1: Bookings route
+// ONLY LOAD BOOKINGS - NO OTHER ROUTES
 try {
-  console.log('🧪 Testing bookings route...');
+  console.log('🧪 Loading bookings route...');
   app.use('/api/bookings', require('./routes/bookings'));
   console.log('✅ Bookings routes loaded successfully');
 } catch (error) {
@@ -107,29 +84,11 @@ try {
   console.error('❌ Stack:', error.stack);
 }
 
-// TEST 2: Clients route (COMMENT OUT BOOKINGS FIRST)
-// try {
-//   console.log('🧪 Testing clients route...');
-//   app.use('/api/clients', require('./routes/clients'));
-//   console.log('✅ Clients routes loaded successfully');
-// } catch (error) {
-//   console.error('❌ CLIENTS ROUTE FAILED:', error.message);
-//   console.error('❌ Stack:', error.stack);
-// }
+console.log('🧪 NO OTHER ROUTES LOADED - TESTING IF SERVER STAYS RUNNING');
 
-// TEST 3: Admin route (COMMENT OUT OTHERS FIRST)
-// try {
-//   console.log('🧪 Testing admin route...');
-//   app.use('/api/admin', require('./routes/admin'));
-//   console.log('✅ Admin routes loaded successfully');
-// } catch (error) {
-//   console.error('❌ ADMIN ROUTE FAILED:', error.message);
-//   console.error('❌ Stack:', error.stack);
-// }
-
-// Simple fallback routes
+// Simple test route
 app.get('/api/test', (req, res) => {
-  res.json({ message: 'Test route working!' });
+  res.json({ message: 'Server is running with bookings only!' });
 });
 
 // Catch-all for unknown routes
@@ -138,7 +97,15 @@ app.use('*', (req, res) => {
     error: 'Route not found',
     path: req.originalUrl,
     method: req.method,
-    mode: 'minimal-test'
+    mode: 'bookings-only-test',
+    availableRoutes: [
+      'GET /',
+      'GET /health',
+      'GET /api/health',
+      'GET /api/test',
+      'GET /api/bookings/test',
+      'POST /api/bookings/test'
+    ]
   });
 });
 
@@ -155,12 +122,12 @@ app.use((err, req, res, next) => {
 
 // Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 MINIMAL TEST SERVER running on http://0.0.0.0:${PORT}`);
+  console.log(`🚀 BOOKINGS-ONLY TEST SERVER running on http://0.0.0.0:${PORT}`);
   console.log(`🔍 Health check: http://localhost:${PORT}/health`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/api/test`);
+  console.log(`🧪 Bookings test: http://localhost:${PORT}/api/bookings/test`);
   
-  // Initialize database after server starts
-  initializeDatabase();
+  // NOTE: NO DATABASE INITIALIZATION - testing routes only
 });
 
 // Graceful shutdown
