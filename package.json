@@ -10,7 +10,7 @@
       "railway-build": "npm install",
       "railway-start": "node server.js"
     },
-    "keywords": ["booking", "website", "api"],
+    "keywords": ["booking", "website", "api", "stripe", "payments"],
     "author": "Cocoa Code",
     "license": "ISC",
     "engines": {
