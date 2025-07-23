@@ -80,7 +80,7 @@ app.get('/', (req, res) => {
     status: 'running',
     timestamp: new Date().toISOString(),
     endpoints: {
-      health: '/health',
+      health: '/api/health',
       bookings: '/api/bookings',
       availability: '/api/bookings/availability/:month',
       clients: '/api/clients',
