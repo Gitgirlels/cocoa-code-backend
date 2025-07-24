@@ -316,9 +316,17 @@ router.get('/status/:paymentId', async (req, res) => {
   }
 });
 
-// Test endpoint to verify Stripe connection
+// Add this to your routes/payments.js file:
 router.get('/test-stripe', async (req, res) => {
   try {
+    // Check if Stripe is properly configured
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({
+        error: 'Stripe not configured',
+        message: 'STRIPE_SECRET_KEY environment variable is missing'
+      });
+    }
+
     // Test Stripe connection by creating a test product
     const testProduct = await stripe.products.create({
       name: 'Test Connection',
