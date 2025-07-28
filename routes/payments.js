@@ -316,41 +316,5 @@ router.get('/status/:paymentId', async (req, res) => {
   }
 });
 
-// Add this to your routes/payments.js file:
-router.get('/test-stripe', async (req, res) => {
-  try {
-    // Check if Stripe is properly configured
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return res.status(500).json({
-        error: 'Stripe not configured',
-        message: 'STRIPE_SECRET_KEY environment variable is missing'
-      });
-    }
-
-    // Test Stripe connection by creating a test product
-    const testProduct = await stripe.products.create({
-      name: 'Test Connection',
-      type: 'service',
-      metadata: { test: 'true' }
-    });
-
-    // Immediately delete the test product
-    await stripe.products.del(testProduct.id);
-
-    res.json({
-      message: '✅ Stripe connection successful',
-      environment: process.env.NODE_ENV,
-      hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET
-    });
-
-  } catch (error) {
-    console.error('❌ Stripe connection test failed:', error);
-    res.status(500).json({
-      error: '❌ Stripe connection failed',
-      details: error.message,
-      suggestion: 'Check your STRIPE_SECRET_KEY environment variable'
-    });
-  }
-});
 
 module.exports = router;
