@@ -5,6 +5,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+
+// Add this line to fix the rate limiting error
+app.set('trust proxy', true);
+
 const PORT = process.env.PORT || 5000;
 
 // Health check endpoint - FIRST for Railway
