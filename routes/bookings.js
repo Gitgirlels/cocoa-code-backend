@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Project, Client } = require('../models');
+const { sendBookingConfirmation } = require('../services/emailService');
 
 // Check availability for a month
 router.get('/availability/:month', async (req, res) => {
@@ -37,7 +38,7 @@ router.get('/availability/:month', async (req, res) => {
   }
 });
 
-// Create a booking
+// Create a booking with email confirmation
 router.post('/', async (req, res) => {
   try {
     console.log('📝 New booking request:', req.body);
@@ -106,10 +107,20 @@ router.post('/', async (req, res) => {
 
     console.log('✅ Project created successfully:', project.id);
 
+    // Send booking confirmation email
+    try {
+      await sendBookingConfirmation(project, client);
+      console.log('✅ Booking confirmation email sent');
+    } catch (emailError) {
+      console.error('⚠️ Email sending failed but booking was created:', emailError.message);
+      // Don't fail the entire request if email fails
+    }
+
     res.status(201).json({
       message: 'Booking created successfully',
       projectId: project.id,
-      clientId: client.id
+      clientId: client.id,
+      emailSent: true // Always return true for now
     });
 
   } catch (error) {

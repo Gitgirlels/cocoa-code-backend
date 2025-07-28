@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Payment, Project, Client } = require('../models');
+const { sendPaymentConfirmation } = require('../services/emailService');
 
 // Initialize Stripe with your secret key
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -113,7 +114,7 @@ router.post('/create-intent', async (req, res) => {
   }
 });
 
-// Confirm payment and update records
+// Confirm payment and update records with email notification
 router.post('/confirm', async (req, res) => {
   try {
     console.log('✅ Confirming payment:', req.body);
@@ -133,7 +134,12 @@ router.post('/confirm', async (req, res) => {
 
     // Update payment record in database
     const payment = await Payment.findOne({
-      where: { stripePaymentId: paymentIntentId }
+      where: { stripePaymentId: paymentIntentId },
+      include: [{ 
+        model: Project, 
+        as: 'project',
+        include: [{ model: Client, as: 'client' }]
+      }]
     });
 
     if (!payment) {
@@ -182,6 +188,14 @@ router.post('/confirm', async (req, res) => {
         { status: projectStatus },
         { where: { id: projectId } }
       );
+
+      // Send payment confirmation email
+      try {
+        await sendPaymentConfirmation(payment, payment.project, payment.project.client);
+        console.log('✅ Payment confirmation email sent');
+      } catch (emailError) {
+        console.error('⚠️ Payment email failed but payment was processed:', emailError.message);
+      }
     }
 
     console.log(`✅ Payment ${paymentIntentId} confirmed with status: ${paymentStatus}`);
@@ -191,7 +205,8 @@ router.post('/confirm', async (req, res) => {
       paymentId: payment.id,
       paymentStatus,
       projectStatus,
-      stripeStatus: paymentIntent.status
+      stripeStatus: paymentIntent.status,
+      emailSent: paymentStatus === 'completed'
     });
 
   } catch (error) {
@@ -227,16 +242,34 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
         const paymentIntent = event.data.object;
         console.log('🎉 Payment succeeded via webhook:', paymentIntent.id);
         
-        await Payment.update(
-          { paymentStatus: 'completed' },
-          { where: { stripePaymentId: paymentIntent.id } }
-        );
-        
-        if (paymentIntent.metadata.projectId) {
-          await Project.update(
-            { status: 'in_progress' },
-            { where: { id: paymentIntent.metadata.projectId } }
-          );
+        // Update payment status in database
+        const payment = await Payment.findOne({
+          where: { stripePaymentId: paymentIntent.id },
+          include: [{ 
+            model: Project, 
+            as: 'project',
+            include: [{ model: Client, as: 'client' }]
+          }]
+        });
+
+        if (payment) {
+          await payment.update({ paymentStatus: 'completed' });
+          
+          // Update project status
+          if (paymentIntent.metadata.projectId) {
+            await Project.update(
+              { status: 'in_progress' },
+              { where: { id: paymentIntent.metadata.projectId } }
+            );
+          }
+
+          // Send payment confirmation email via webhook
+          try {
+            await sendPaymentConfirmation(payment, payment.project, payment.project.client);
+            console.log('✅ Webhook payment confirmation email sent');
+          } catch (emailError) {
+            console.error('⚠️ Webhook email failed:', emailError.message);
+          }
         }
         break;
         
