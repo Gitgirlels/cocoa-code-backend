@@ -46,7 +46,7 @@ router.post('/create-intent', async (req, res) => {
         projectId: projectId.toString(),
         clientEmail: project.client?.email || 'unknown',
         projectType: project.projectType || 'unknown',
-        environment: process.env.NODE_ENV || 'development'
+        environment: process.env.NODE_ENV || 'production'
       },
       description: `Cocoa Code - ${project.projectType} project for ${project.client?.name || 'Client'}`,
       receipt_email: project.client?.email,
@@ -108,7 +108,7 @@ router.post('/create-intent', async (req, res) => {
 
     res.status(500).json({ 
       error: 'Payment processing failed',
-      message: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      message: 'Internal server error'
     });
   }
 });
@@ -198,7 +198,7 @@ router.post('/confirm', async (req, res) => {
     console.error('❌ Payment confirmation error:', error);
     res.status(500).json({ 
       error: 'Payment confirmation failed',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      details: 'Internal server error'
     });
   }
 });
@@ -209,7 +209,6 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
   let event;
 
   try {
-    // Verify webhook signature (you'll need to set STRIPE_WEBHOOK_SECRET in your env)
     if (process.env.STRIPE_WEBHOOK_SECRET) {
       event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } else {
@@ -228,13 +227,11 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
         const paymentIntent = event.data.object;
         console.log('🎉 Payment succeeded via webhook:', paymentIntent.id);
         
-        // Update payment status in database
         await Payment.update(
           { paymentStatus: 'completed' },
           { where: { stripePaymentId: paymentIntent.id } }
         );
         
-        // Update project status
         if (paymentIntent.metadata.projectId) {
           await Project.update(
             { status: 'in_progress' },
@@ -311,10 +308,9 @@ router.get('/status/:paymentId', async (req, res) => {
     console.error('❌ Get payment status error:', error);
     res.status(500).json({ 
       error: 'Failed to retrieve payment status',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      details: 'Internal server error'
     });
   }
 });
-
 
 module.exports = router;
