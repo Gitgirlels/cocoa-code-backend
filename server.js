@@ -129,10 +129,14 @@ async function loadRoutes() {
     // Load routes properly
     const bookingsRouter = require('./routes/bookings');
     const paymentsRouter = require('./routes/payments');
+    const clientsRouter = require('./routes/clients');
+    const adminRouter = require('./routes/admin');
     
     // Use the routers
     app.use('/api/bookings', bookingsRouter);
     app.use('/api/payments', paymentsRouter);
+    app.use('/api/clients', clientsRouter);
+    app.use('/api/admin', adminRouter);
     
     console.log('✅ All routes loaded successfully');
     
@@ -186,6 +190,8 @@ app.use('*', (req, res) => {
     availableEndpoints: [
       '/api/health',
       '/api/bookings',
+      '/api/admin',
+      '/api/clients',
       '/api/payments',
       '/api/bookings/availability/:month'
     ]
