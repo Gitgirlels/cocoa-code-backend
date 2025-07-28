@@ -5,11 +5,10 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
-
-// Add this line to fix the rate limiting error
-app.set('trust proxy', true);
-
 const PORT = process.env.PORT || 5000;
+
+// IMPORTANT: Add this for Railway deployment
+app.set('trust proxy', true);
 
 // Health check endpoint - FIRST for Railway
 app.get('/api/health', (req, res) => {
@@ -27,6 +26,7 @@ const limiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true
 });
 
 app.use(limiter);
@@ -120,57 +120,44 @@ async function initializeDatabase() {
   }
 }
 
-// Routes with database dependency
-app.use('/api/bookings', async (req, res, next) => {
+// CORRECTED: Proper route loading function
+async function loadRoutes() {
   try {
-    if (!dbInitialized) {
-      await initializeDatabase();
-    }
-    require('./routes/bookings')(req, res, next);
+    // Initialize database first
+    await initializeDatabase();
+    
+    // Load routes properly
+    const bookingsRouter = require('./routes/bookings');
+    const paymentsRouter = require('./routes/payments');
+    
+    // Use the routers
+    app.use('/api/bookings', bookingsRouter);
+    app.use('/api/payments', paymentsRouter);
+    
+    console.log('✅ All routes loaded successfully');
+    
   } catch (error) {
-    console.error('❌ Bookings route error:', error);
-    res.status(503).json({ error: 'Service temporarily unavailable' });
+    console.error('❌ Error loading routes:', error.message);
+    
+    // Fallback routes if main routes fail
+    app.use('/api/bookings', (req, res) => {
+      res.status(503).json({ 
+        error: 'Bookings service temporarily unavailable',
+        details: 'Database connection issue'
+      });
+    });
+    
+    app.use('/api/payments', (req, res) => {
+      res.status(503).json({ 
+        error: 'Payment service temporarily unavailable',
+        details: 'Service configuration issue'
+      });
+    });
   }
-});
+}
 
-app.use('/api/clients', async (req, res, next) => {
-  try {
-    if (!dbInitialized) {
-      await initializeDatabase();
-    }
-    require('./routes/clients')(req, res, next);
-  } catch (error) {
-    console.error('❌ Clients route error:', error);
-    res.status(503).json({ error: 'Service temporarily unavailable' });
-  }
-});
-
-app.use('/api/admin', async (req, res, next) => {
-  try {
-    if (!dbInitialized) {
-      await initializeDatabase();
-    }
-    require('./routes/admin')(req, res, next);
-  } catch (error) {
-    console.error('❌ Admin route error:', error);
-    res.status(503).json({ error: 'Service temporarily unavailable' });
-  }
-});
-
-app.use('/api/payments', async (req, res, next) => {
-  try {
-    if (!dbInitialized) {
-      await initializeDatabase();
-    }
-    require('./routes/payments')(req, res, next);
-  } catch (error) {
-    console.error('❌ Payments route error:', error);
-    res.status(503).json({ error: 'Service temporarily unavailable' });
-  }
-});
-
-// Fallback routes
-app.post('/api/bookings', (req, res) => {
+// Fallback routes for testing
+app.post('/api/bookings/fallback', (req, res) => {
   console.log('📝 Fallback booking route');
   res.json({
     message: 'Booking received (fallback mode)',
@@ -179,7 +166,7 @@ app.post('/api/bookings', (req, res) => {
   });
 });
 
-app.get('/api/bookings/availability/:month', (req, res) => {
+app.get('/api/bookings/availability/fallback/:month', (req, res) => {
   console.log('📅 Fallback availability check');
   res.json({
     available: true,
@@ -195,7 +182,13 @@ app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
     path: req.originalUrl,
-    method: req.method
+    method: req.method,
+    availableEndpoints: [
+      '/api/health',
+      '/api/bookings',
+      '/api/payments',
+      '/api/bookings/availability/:month'
+    ]
   });
 });
 
@@ -208,34 +201,30 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', async () => {
+// Start server and load routes
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   
-  // Initialize database after server starts
-  await initializeDatabase();
+  // Load routes after server starts
+  await loadRoutes();
 });
 
-// Graceful shutdown
+// Graceful shutdown handlers
 process.on('SIGTERM', () => {
   console.log('🔄 SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    if (db?.sequelize) {
-      db.sequelize.close();
-    }
-    process.exit(0);
-  });
+  if (db?.sequelize) {
+    db.sequelize.close();
+  }
+  process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('🔄 SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    if (db?.sequelize) {
-      db.sequelize.close();
-    }
-    process.exit(0);
-  });
+  if (db?.sequelize) {
+    db.sequelize.close();
+  }
+  process.exit(0);
 });
 
 module.exports = app;
