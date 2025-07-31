@@ -171,25 +171,77 @@ app.get('/api/payments/test-stripe', (req, res) => {
   });
 });
 
-// Root route
+// Replace the root route in your server.js with this complete version:
+
 app.get('/', (req, res) => {
   res.json({
     message: '🍫 Welcome to Cocoa Code API!',
     status: 'running',
     timestamp: new Date().toISOString(),
     availableRoutes: [
+      // Basic routes
       '/',
       '/api/health',
       '/api/test',
+      
+      // Booking routes
       '/api/bookings',
       '/api/bookings/test',
       '/api/bookings/debug',
-      '/api/bookings/availability/:month'
-    ]
+      '/api/bookings/availability/:month',
+      
+      // Admin routes
+      '/api/admin/login',
+      '/api/admin/verify', 
+      '/api/admin/inquiries',
+      '/api/admin/inquiries/:id/status',
+      '/api/admin/stats',
+      
+      // Client routes
+      '/api/clients',
+      '/api/clients/:id',
+      
+      // Payment routes
+      '/api/payments/create-intent',
+      '/api/payments/confirm',
+      '/api/payments/webhook',
+      '/api/payments/status/:paymentId',
+      '/api/payments/test-stripe'
+    ],
+    routeCategories: {
+      public: [
+        '/api/health',
+        '/api/test',
+        '/api/bookings',
+        '/api/bookings/availability/:month'
+      ],
+      admin: [
+        '/api/admin/login',
+        '/api/admin/verify',
+        '/api/admin/inquiries',
+        '/api/admin/inquiries/:id/status',
+        '/api/admin/stats'
+      ],
+      clients: [
+        '/api/clients',
+        '/api/clients/:id'
+      ],
+      payments: [
+        '/api/payments/create-intent',
+        '/api/payments/confirm',
+        '/api/payments/webhook',
+        '/api/payments/status/:paymentId',
+        '/api/payments/test-stripe'
+      ],
+      testing: [
+        '/api/bookings/test',
+        '/api/bookings/debug'
+      ]
+    }
   });
 });
 
-// Catch all unknown routes
+// Also update the catch-all route to include all endpoints:
 app.use('*', (req, res) => {
   console.log(`❓ Unknown route: ${req.method} ${req.originalUrl}`);
   
@@ -201,17 +253,38 @@ app.use('*', (req, res) => {
       timestamp: new Date().toISOString()
     },
     availableRoutes: [
+      // Basic
       'GET /',
       'GET /api/health',
       'GET /api/test',
+      
+      // Bookings
       'POST /api/bookings',
       'POST /api/bookings/test',
       'GET /api/bookings/debug',
-      'GET /api/bookings/availability/:month'
-    ]
+      'GET /api/bookings/availability/:month',
+      
+      // Admin
+      'POST /api/admin/login',
+      'POST /api/admin/verify',
+      'GET /api/admin/inquiries',
+      'PUT /api/admin/inquiries/:id/status',
+      'GET /api/admin/stats',
+      
+      // Clients
+      'GET /api/clients',
+      'GET /api/clients/:id',
+      
+      // Payments
+      'POST /api/payments/create-intent',
+      'POST /api/payments/confirm',
+      'POST /api/payments/webhook',
+      'GET /api/payments/status/:paymentId',
+      'GET /api/payments/test-stripe'
+    ],
+    suggestion: 'Check the root endpoint (/) for a complete list of available routes'
   });
 });
-
 // Error handling
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err);
