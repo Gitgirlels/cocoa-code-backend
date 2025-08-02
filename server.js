@@ -54,8 +54,52 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// DIRECT BOOKING ROUTES - No separate router file for now
-console.log('📝 Setting up booking routes...');
+// ADD DATABASE CONNECTION TEST
+const { sequelize, Client, Project, Payment } = require('./models');
+
+async function testDatabaseConnection() {
+  try {
+    console.log('🔄 Testing database connection...');
+    await sequelize.authenticate();
+    console.log('✅ Database connection established successfully.');
+    
+    // Test table creation/sync
+    await sequelize.sync({ alter: false });
+    console.log('✅ Database tables are ready.');
+    
+    const clientCount = await Client.count();
+    const projectCount = await Project.count();
+    console.log(`📈 Current data: ${clientCount} clients, ${projectCount} projects`);
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+    console.error('Full error:', error);
+    return false;
+  }
+}
+
+// IMPORT AND USE EXISTING ROUTE FILES
+try {
+  const bookingRoutes = require('./routes/bookings');
+  const adminRoutes = require('./routes/admin');
+  const clientRoutes = require('./routes/clients');
+  const paymentRoutes = require('./routes/payments');
+
+  // USE ROUTES - This will make your admin panel work!
+  app.use('/api/bookings', bookingRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/clients', clientRoutes);
+  app.use('/api/payments', paymentRoutes);
+  
+  console.log('✅ All route files loaded successfully');
+} catch (error) {
+  console.error('❌ Error loading route files:', error.message);
+  console.log('📝 Falling back to direct routes in server.js');
+}
+
+// KEEP ALL YOUR EXISTING DIRECT BOOKING ROUTES AS BACKUP
+console.log('📝 Setting up backup booking routes...');
 
 // GET availability
 app.get('/api/bookings/availability/:month', (req, res) => {
@@ -71,7 +115,7 @@ app.get('/api/bookings/availability/:month', (req, res) => {
   });
 });
 
-// POST booking - SIMPLIFIED VERSION
+// POST booking - SIMPLIFIED VERSION (your existing code)
 app.post('/api/bookings', async (req, res) => {
   console.log('📝 BOOKING REQUEST RECEIVED!');
   console.log('Request body:', req.body);
@@ -100,14 +144,77 @@ app.post('/api/bookings', async (req, res) => {
     
     console.log('✅ Validation passed - creating booking...');
     
-    // For now, just return success without database
+    // Try to use database models if available
+    if (Client && Project) {
+      try {
+        console.log('💾 Attempting to save to database...');
+        
+        // Create or find client
+        const [client, created] = await Client.findOrCreate({
+          where: { email: clientEmail },
+          defaults: { 
+            name: clientName, 
+            email: clientEmail 
+          }
+        });
+        
+        console.log(`✅ Client ${created ? 'created' : 'found'}:`, client.id);
+        
+        // Create project
+        const project = await Project.create({
+          clientId: client.id,
+          projectType: projectType || 'custom',
+          specifications: projectSpecs || 'No specifications provided',
+          websiteType: 'other',
+          primaryColor: '#8B4513',
+          secondaryColor: '#D2B48C', 
+          accentColor: '#CD853F',
+          basePrice: 0,
+          totalPrice: 0,
+          bookingMonth: bookingMonth || null,
+          status: 'pending'
+        });
+        
+        console.log('✅ Project saved to database:', project.id);
+        
+        // Try to send email
+        try {
+          const { sendBookingConfirmation } = require('./services/emailService');
+          await sendBookingConfirmation(project, client);
+          console.log('✅ Booking confirmation email sent');
+        } catch (emailError) {
+          console.warn('⚠️ Email sending failed:', emailError.message);
+        }
+        
+        return res.status(201).json({
+          message: 'Booking created successfully and saved to database!',
+          projectId: project.id,
+          clientId: client.id,
+          bookingDetails: {
+            clientName,
+            clientEmail,
+            projectSpecs,
+            bookingMonth,
+            projectType
+          },
+          timestamp: new Date().toISOString(),
+          databaseSaved: true
+        });
+        
+      } catch (dbError) {
+        console.error('❌ Database save failed:', dbError.message);
+        // Fall through to test mode below
+      }
+    }
+    
+    // Fallback to test mode if database fails
     const projectId = 'PROJ-' + Date.now();
     const clientId = 'CLIENT-' + Date.now();
     
-    console.log('✅ Booking created successfully!', { projectId, clientId });
+    console.log('⚠️ Using test mode - booking not saved to database');
     
     res.status(201).json({
-      message: 'Booking created successfully',
+      message: 'Booking created successfully (test mode - not saved to database)',
       projectId: projectId,
       clientId: clientId,
       bookingDetails: {
@@ -117,7 +224,9 @@ app.post('/api/bookings', async (req, res) => {
         bookingMonth,
         projectType
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      databaseSaved: false,
+      warning: 'Database connection issue - booking not permanently saved'
     });
     
   } catch (error) {
@@ -143,21 +252,69 @@ app.post('/api/bookings/test', (req, res) => {
 });
 
 // Debug endpoint
-app.get('/api/bookings/debug', (req, res) => {
+app.get('/api/bookings/debug', async (req, res) => {
   console.log('🔍 Debug info requested');
   
-  res.json({
-    message: 'Debug endpoint working',
-    routes: [
-      'GET /api/health',
-      'GET /api/test', 
-      'GET /api/bookings/availability/:month',
-      'POST /api/bookings',
-      'POST /api/bookings/test',
-      'GET /api/bookings/debug'
-    ],
-    timestamp: new Date().toISOString()
-  });
+  try {
+    if (!Project || !Client) {
+      return res.json({
+        message: 'Database models not available',
+        modelsAvailable: false,
+        timestamp: new Date().toISOString(),
+        routes: [
+          'GET /api/health',
+          'GET /api/test', 
+          'GET /api/bookings/availability/:month',
+          'POST /api/bookings',
+          'POST /api/bookings/test',
+          'GET /api/bookings/debug'
+        ]
+      });
+    }
+
+    const projects = await Project.findAll({
+      include: [{ model: Client, as: 'client' }],
+      order: [['createdAt', 'DESC']],
+      limit: 10
+    });
+    
+    const summary = {};
+    projects.forEach(project => {
+      if (project.bookingMonth) {
+        summary[project.bookingMonth] = (summary[project.bookingMonth] || 0) + 1;
+      }
+    });
+    
+    res.json({
+      totalProjects: projects.length,
+      bookingsByMonth: summary,
+      recentProject: projects[0] ? {
+        id: projects[0].id,
+        type: projects[0].projectType,
+        month: projects[0].bookingMonth,
+        client: projects[0].client?.name,
+        status: projects[0].status,
+        createdAt: projects[0].createdAt
+      } : null,
+      allProjects: projects.map(p => ({
+        id: p.id,
+        type: p.projectType,
+        client: p.client?.name,
+        email: p.client?.email,
+        status: p.status,
+        month: p.bookingMonth,
+        createdAt: p.createdAt
+      })),
+      modelsAvailable: true,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    res.status(500).json({ 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Payments test endpoint
@@ -167,12 +324,13 @@ app.get('/api/payments/test-stripe', (req, res) => {
   res.json({
     message: 'Stripe test endpoint',
     hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
+    hasStripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
+    environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
   });
 });
 
-// Replace the root route in your server.js with this complete version:
-
+// Root route with complete API documentation
 app.get('/', (req, res) => {
   res.json({
     message: '🍫 Welcome to Cocoa Code API!',
@@ -241,7 +399,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// Also update the catch-all route to include all endpoints:
+// Catch-all route for unknown endpoints
 app.use('*', (req, res) => {
   console.log(`❓ Unknown route: ${req.method} ${req.originalUrl}`);
   
@@ -285,6 +443,7 @@ app.use('*', (req, res) => {
     suggestion: 'Check the root endpoint (/) for a complete list of available routes'
   });
 });
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error('❌ Server error:', err);
@@ -295,18 +454,51 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
+// Start server with enhanced diagnostics
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Test database connection
+  const dbConnected = await testDatabaseConnection();
+  
+  if (!dbConnected) {
+    console.error('⚠️ WARNING: Database not connected - bookings will not be saved permanently!');
+    console.error('Check your DATABASE_URL environment variable');
+    console.error('Bookings will work in test mode but won\'t be saved to database');
+  } else {
+    console.log('✅ Database connected - bookings will be saved properly');
+  }
+  
+  // Test email configuration
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error('⚠️ WARNING: Email not configured - no confirmation emails will be sent!');
+    console.error('Set EMAIL_USER and EMAIL_PASS environment variables');
+    console.error('EMAIL_USER should be: cocoacodeco@gmail.com');
+    console.error('EMAIL_PASS should be: Gmail app password (16 characters)');
+  } else {
+    console.log('✅ Email service configured');
+  }
+  
+  // Test Stripe configuration
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('⚠️ WARNING: Stripe not configured - payments will not work!');
+    console.error('Set STRIPE_SECRET_KEY environment variable');
+  } else {
+    console.log('✅ Stripe configured');
+  }
+  
   console.log('📋 Available routes:');
-  console.log('  GET  /', );
+  console.log('  GET  /');
   console.log('  GET  /api/health');
   console.log('  GET  /api/test');
   console.log('  POST /api/bookings');
   console.log('  POST /api/bookings/test');
   console.log('  GET  /api/bookings/debug');
   console.log('  GET  /api/bookings/availability/:month');
+  console.log('  GET  /api/admin/stats');
+  console.log('  GET  /api/clients');
+  console.log('  POST /api/payments/create-intent');
   console.log('🎉 Server ready to receive requests!');
 });
 
