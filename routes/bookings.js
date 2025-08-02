@@ -157,9 +157,10 @@ router.post('/', async (req, res) => {
     }
 
     // Create project
-    let project;
-    try {
-      const projectData = {
+   // Create project
+let project;
+try {
+    const projectData = {
         clientId: client.id,
         projectType: projectType || 'service-only',
         specifications: projectSpecs || 'No specifications provided',
@@ -170,8 +171,11 @@ router.post('/', async (req, res) => {
         basePrice: parseFloat(basePrice) || 0,
         totalPrice: parseFloat(totalPrice) || 0,
         bookingMonth: bookingMonth || null,
-        status: 'pending'
-      };
+        status: 'pending',
+        paymentStatus: req.body.paymentStatus || 'pending',
+        // Store encrypted payment token (in production, use proper encryption)
+        paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
+    };
 
       project = await Project.create(projectData);
       console.log('✅ Project created successfully:', project.id);
