@@ -20,6 +20,7 @@ const sendBookingConfirmation = async (booking, client) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: client.email,
+      cc: process.env.EMAIL_USER, 
       subject: '🎉 Your Cocoa Code Project is Confirmed!',
       html: `
         <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F5F5DC; padding: 20px; border-radius: 15px;">
