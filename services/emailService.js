@@ -1,22 +1,22 @@
-// services/emailService.js - Add this file to your backend
+// services/emailService.js - Fixed version
 const nodemailer = require('nodemailer');
 
-// Create email transporter
+// ✅ Correct transporter function
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     service: 'gmail', // or your preferred email service
     auth: {
       user: process.env.EMAIL_USER, // your email address
-      pass: process.env.EMAIL_PASS  // your app password
+      pass: process.env.EMAIL_PASS  // your Gmail app password
     }
   });
 };
 
-// Send booking confirmation email
+// ✅ Send booking confirmation email
 const sendBookingConfirmation = async (booking, client) => {
   try {
     const transporter = createTransporter();
-    
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: client.email,
@@ -65,22 +65,22 @@ const sendBookingConfirmation = async (booking, client) => {
         </div>
       `
     };
-    
+
     await transporter.sendMail(mailOptions);
     console.log('✅ Booking confirmation email sent to:', client.email);
     return true;
-    
+
   } catch (error) {
     console.error('❌ Failed to send booking confirmation email:', error);
     return false;
   }
 };
 
-// Send payment confirmation email
+// ✅ Send payment confirmation email
 const sendPaymentConfirmation = async (payment, project, client) => {
   try {
     const transporter = createTransporter();
-    
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: client.email,
@@ -111,11 +111,11 @@ const sendPaymentConfirmation = async (payment, project, client) => {
         </div>
       `
     };
-    
+
     await transporter.sendMail(mailOptions);
     console.log('✅ Payment confirmation email sent to:', client.email);
     return true;
-    
+
   } catch (error) {
     console.error('❌ Failed to send payment confirmation email:', error);
     return false;
