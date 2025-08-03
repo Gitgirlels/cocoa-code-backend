@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
 
-// ✅ Correct transporter
 const createTransporter = () => {
   return nodemailer.createTransport({
     service: 'gmail',
@@ -11,7 +10,6 @@ const createTransporter = () => {
   });
 };
 
-// ✅ Helper: build receipt table from items array
 const buildReceiptTable = (items, totalPrice) => {
   if (!items || !Array.isArray(items) || items.length === 0) {
     return `<tr><td colspan="2" style="padding: 8px;">No order details available</td></tr>`;
@@ -33,103 +31,84 @@ const buildReceiptTable = (items, totalPrice) => {
   `;
 };
 
-// ✅ Booking confirmation email
-const sendBookingConfirmation = async (booking, client) => {
+// ✅ Approval email
+const sendApprovalEmail = async (booking, client) => {
   try {
     const transporter = createTransporter();
-
     const receiptRows = buildReceiptTable(booking.items, booking.totalPrice);
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: client.email,
-      subject: '🎉 Cocoa Code - Your Project Booking Confirmation',
+      subject: '✅ Cocoa Code - Your Booking Has Been Approved',
       html: `
         <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F5F5DC; padding: 20px; border-radius: 15px;">
-          <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #654321;">🍫 Cocoa Code</h1>
-            <p style="color: #8B4513;">Where great websites are crafted with sweetness</p>
-          </div>
+          <h1 style="color: #8B4513;">🎉 Good news, ${client.name}!</h1>
+          <p>Your project booking has been <strong>approved</strong>. We’re now processing your payment and will begin work shortly.</p>
           
-          <div style="background: white; padding: 20px; border-radius: 10px; border: 2px solid #8B4513;">
-            <h2 style="color: #654321;">📋 Booking Confirmation</h2>
-            <p>Hi ${client.name},</p>
-            <p>Thank you for booking with Cocoa Code! Here are your order details:</p>
-            
-            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-              <thead>
-                <tr>
-                  <th style="text-align:left; padding:8px; border:1px solid #ddd;">Service</th>
-                  <th style="text-align:left; padding:8px; border:1px solid #ddd;">Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${receiptRows}
-              </tbody>
-            </table>
-            
-            <p style="margin-top: 15px;"><strong>Booking Month:</strong> ${booking.bookingMonth}</p>
-            <p><strong>Status:</strong> ${booking.status}</p>
-            <p><strong>Project Specs:</strong> ${booking.projectSpecs}</p>
-            
-            <div style="margin-top: 20px; background: #CD853F; color: white; padding: 10px; border-radius: 5px; text-align: center;">
-              We'll be in touch soon to finalize your project details!
-            </div>
-          </div>
+          <h2 style="margin-top: 20px;">📋 Order Details</h2>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px; border:1px solid #ddd;">Service</th>
+                <th style="text-align:left; padding:8px; border:1px solid #ddd;">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${receiptRows}
+            </tbody>
+          </table>
+
+          <p style="margin-top: 15px;"><strong>Booking Month:</strong> ${booking.bookingMonth}</p>
+          <p><strong>Project Specs:</strong> ${booking.projectSpecs}</p>
           
-          <p style="text-align: center; margin-top: 20px; color: #8B4513;">The Cocoa Code Team ☕</p>
+          <p style="margin-top: 20px;">You'll receive another email once the project starts.</p>
+          <p style="color: #654321;">– Cocoa Code Team</p>
         </div>
       `
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('✅ Detailed booking confirmation email sent to:', client.email);
+    console.log('✅ Approval email sent to:', client.email);
     return true;
 
   } catch (error) {
-    console.error('❌ Failed to send booking confirmation email:', error);
+    console.error('❌ Failed to send approval email:', error);
     return false;
   }
 };
 
-// ✅ Payment confirmation email
-const sendPaymentConfirmation = async (payment, project, client) => {
+// ❌ Decline email
+const sendDeclineEmail = async (client) => {
   try {
     const transporter = createTransporter();
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: client.email,
-      subject: '💳 Payment Confirmation - Cocoa Code',
+      subject: '⚠️ Cocoa Code - Your Booking Request Was Declined',
       html: `
-        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F5F5DC; padding: 20px; border-radius: 15px;">
-          <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #654321;">🍫 Cocoa Code</h1>
-          </div>
-          <div style="background: white; padding: 20px; border-radius: 10px; border: 2px solid #8B4513;">
-            <h2 style="color: #654321;">💳 Payment Successful!</h2>
-            <p>Hi ${client.name},</p>
-            <p>Your payment has been processed successfully for your ${project.projectType} project.</p>
-            <p><strong>Amount Paid:</strong> $${payment.amount} AUD</p>
-            <p><strong>Payment Status:</strong> ${payment.paymentStatus}</p>
-            <p><strong>Project ID:</strong> ${project.id}</p>
-            <p>We’ll begin work on your project immediately and keep you updated!</p>
-          </div>
+        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #FFEEEE; padding: 20px; border-radius: 15px;">
+          <h2 style="color: #B22222;">Hi ${client.name},</h2>
+          <p>We’ve reviewed your request but unfortunately, we were unable to accept your project at this time.</p>
+          <p><strong>No payment has been taken</strong> from your card.</p>
+          <p>You’re welcome to reply to this email if you'd like to discuss alternative options or modify your request.</p>
+          <p style="margin-top: 20px; color: #B22222;">– Cocoa Code Team</p>
         </div>
       `
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('✅ Payment confirmation email sent to:', client.email);
+    console.log('📩 Decline email sent to:', client.email);
     return true;
 
   } catch (error) {
-    console.error('❌ Failed to send payment confirmation email:', error);
+    console.error('❌ Failed to send decline email:', error);
     return false;
   }
 };
 
 module.exports = {
-  sendBookingConfirmation,
-  sendPaymentConfirmation
+  sendApprovalEmail,
+  sendDeclineEmail
 };

@@ -171,8 +171,8 @@ try {
         basePrice: parseFloat(basePrice) || 0,
         totalPrice: parseFloat(totalPrice) || 0,
         bookingMonth: bookingMonth || null,
-        status: 'pending',
-        paymentStatus: req.body.paymentStatus || 'pending',
+        status: 'pending_review',
+paymentStatus: 'awaiting_approval',
         // Store encrypted payment token (in production, use proper encryption)
         paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
     };
@@ -263,6 +263,46 @@ router.post('/test', async (req, res) => {
     });
   }
 });
+
+// Approve
+router.post('/:id/approve', async (req, res) => {
+  try {
+    const project = await Project.findByPk(req.params.id, { include: [Client] });
+    if (!project) return res.status(404).json({ error: 'Booking not found' });
+
+    project.status = 'approved';
+    project.paymentStatus = 'processing_payment';
+    await project.save();
+
+    // Send email
+    await sendApprovalEmail(project.toJSON(), project.Client);
+
+    res.json({ success: true, message: 'Booking approved and customer notified.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to approve booking' });
+  }
+});
+
+
+// Decline
+router.post('/:id/decline', async (req, res) => {
+  try {
+    const project = await Project.findByPk(req.params.id, { include: [Client] });
+    if (!project) return res.status(404).json({ error: 'Booking not found' });
+
+    project.status = 'declined';
+    project.paymentStatus = 'not_charged';
+    await project.save();
+
+    // Send email
+    await sendDeclineEmail(project.Client);
+
+    res.json({ success: true, message: 'Booking declined and customer notified.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to decline booking' });
+  }
+});
+
 
 // Debug endpoint
 router.get('/debug', async (req, res) => {
