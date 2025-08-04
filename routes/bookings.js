@@ -23,9 +23,8 @@ router.get('/availability/:month', async (req, res) => {
     if (!Project) {
       return res.json({ 
         available: true, 
-        currentBookings: 0,
+        currentBookings: bookingCount,
         month: decodedMonth,
-        maxBookings: 4,
         note: 'Database not connected - assuming available'
       });
     }
@@ -39,14 +38,13 @@ router.get('/availability/:month', async (req, res) => {
 
     console.log(`📈 Bookings for "${decodedMonth}": ${bookingCount}/4`);
 
-    const isAvailable = bookingCount < 4;
-    
     res.json({ 
-      available: isAvailable, 
+      available: true, 
       currentBookings: bookingCount,
       month: decodedMonth,
-      maxBookings: 4
+      maxBookings: 9999 // or just remove if unused in frontend
     });
+    
 
   } catch (error) {
     console.error('❌ Error checking availability:', error);
@@ -115,26 +113,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check month availability for main projects (skip for service-only)
-    if (projectType && projectType !== 'service-only' && bookingMonth) {
-      try {
-        const bookingCount = await Project.count({ 
-          where: { 
-            bookingMonth,
-            status: { [require('sequelize').Op.ne]: 'cancelled' }
-          }
-        });
-        
-        if (bookingCount >= 4) {
-          return res.status(400).json({ 
-            error: `${bookingMonth} is fully booked (${bookingCount}/4 slots taken)` 
-          });
-        }
-        console.log('✅ Month availability checked');
-      } catch (error) {
-        console.warn('⚠️ Availability check failed, continuing:', error.message);
-      }
-    }
+    
 
     // Create or find client
     let client;
