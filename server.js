@@ -79,6 +79,30 @@ async function testDatabaseConnection() {
   }
 }
 
+// Fix database schema
+async function fixDatabaseSchema() {
+  try {
+    console.log('🔧 Updating database schema...');
+    await sequelize.sync({ alter: true });
+    console.log('✅ Database schema updated successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to update schema:', error);
+    return false;
+  }
+}
+
+// Add this to your server startup
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  
+  const dbConnected = await testDatabaseConnection();
+  if (dbConnected) {
+    await fixDatabaseSchema(); // Add this line
+  }
+  
+  // ... rest of your code
+});
 // IMPORT AND USE EXISTING ROUTE FILES
 try {
   const bookingRoutes = require('./routes/bookings');

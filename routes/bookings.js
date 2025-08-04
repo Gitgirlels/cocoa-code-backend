@@ -150,7 +150,7 @@ try {
         basePrice: parseFloat(basePrice) || 0,
         totalPrice: parseFloat(totalPrice) || 0,
         bookingMonth: bookingMonth || null,
-        status: 'pending_review',
+        status: 'pending',
 paymentStatus: 'awaiting_approval',
         // Store encrypted payment token (in production, use proper encryption)
         paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
