@@ -79,30 +79,26 @@ async function testDatabaseConnection() {
   }
 }
 
-// Fix database schema
+// ADD THE MISSING fixDatabaseSchema FUNCTION
 async function fixDatabaseSchema() {
   try {
-    console.log('🔧 Updating database schema...');
+    console.log('🔧 Fixing database schema issues...');
+    
+    // Force update the database schema to match models
     await sequelize.sync({ alter: true });
-    console.log('✅ Database schema updated successfully');
+    console.log('✅ Database schema synchronized successfully');
+    
+    // Test that the fix worked by checking table structure
+    const [results] = await sequelize.query("DESCRIBE projects");
+    const statusColumn = results.find(col => col.Field === 'status');
+    console.log('✅ Status column definition:', statusColumn);
+    
     return true;
   } catch (error) {
-    console.error('❌ Failed to update schema:', error);
+    console.error('❌ Schema fix failed:', error);
     return false;
   }
 }
-
-// Add this to your server startup
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-  
-  const dbConnected = await testDatabaseConnection();
-  if (dbConnected) {
-    await fixDatabaseSchema(); // Add this line
-  }
-  
-  // ... rest of your code
-});
 // IMPORT AND USE EXISTING ROUTE FILES
 try {
   const bookingRoutes = require('./routes/bookings');
@@ -134,8 +130,9 @@ app.get('/api/bookings/availability/:month', (req, res) => {
     available: true,
     currentBookings: 0,
     month: req.params.month,
-    maxBookings: 4,
-    note: 'Direct route - always available for testing'
+    maxBookings: 99999,
+    unlimited: true,
+    note: 'No booking limits - always available'
   });
 });
 

@@ -10,53 +10,26 @@ try {
 } catch (error) {
   console.error('❌ Models not available:', error.message);
 }
+// 🔧 FIXED AVAILABILITY ROUTE - No more variable reference errors
 
 // Check availability for a month
+
+// ALTERNATIVE SIMPLIFIED VERSION - Even safer:
 router.get('/availability/:month', async (req, res) => {
-  try {
-    const { month } = req.params;
-    const decodedMonth = decodeURIComponent(month);
-
-    console.log('📅 Availability check for month:', decodedMonth);
-    
-    // If no database, return available
-    if (!Project) {
-      return res.json({ 
-        available: true, 
-        currentBookings: bookingCount,
-        month: decodedMonth,
-        note: 'Database not connected - assuming available'
-      });
-    }
-    
-    const bookingCount = await Project.count({
-      where: { 
-        bookingMonth: decodedMonth,
-        status: { [require('sequelize').Op.ne]: 'cancelled' }
-      }
-    });
-
-    console.log(`📈 Bookings for "${decodedMonth}": ${bookingCount}/4`);
-
-    res.json({ 
-      available: true, 
-      currentBookings: bookingCount,
-      month: decodedMonth,
-      maxBookings: 9999 // or just remove if unused in frontend
-    });
-    
-
-  } catch (error) {
-    console.error('❌ Error checking availability:', error);
-    // Return available on error to not block bookings
-    res.json({ 
-      available: true,
-      currentBookings: 0,
-      month: req.params.month,
-      maxBookings: 4,
-      error: error.message
-    });
-  }
+  const { month } = req.params;
+  const decodedMonth = decodeURIComponent(month);
+  
+  console.log('📅 Availability check for month:', decodedMonth);
+  
+  // ALWAYS return available - no database checks needed
+  res.json({ 
+    available: true, 
+    currentBookings: 0, // Could get real count if needed, but not for limiting
+    month: decodedMonth,
+    maxBookings: 999999,
+    unlimited: true,
+    message: 'All months are available - no booking limits'
+  });
 });
 
 // FIXED: Simplified booking creation with better error handling
