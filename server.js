@@ -338,6 +338,138 @@ app.get('/api/bookings/debug', async (req, res) => {
   }
 });
 
+// Add these routes to your server.js file after your existing booking routes
+
+// ✅ APPROVE BOOKING ROUTE
+app.post('/api/bookings/:id/approve', async (req, res) => {
+  try {
+    console.log(`✅ Approving booking ${req.params.id}`);
+    
+    if (!Project || !Client) {
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
+    }
+
+    const project = await Project.findByPk(req.params.id, { 
+      include: [{ model: Client, as: 'client' }] 
+    });
+    
+    if (!project) {
+      return res.status(404).json({ 
+        error: 'Booking not found' 
+      });
+    }
+
+    // Update project status
+    await project.update({ 
+      status: 'approved'
+    });
+
+    console.log(`✅ Booking ${req.params.id} approved successfully`);
+
+    res.json({ 
+      success: true, 
+      message: 'Booking approved successfully',
+      projectId: project.id,
+      status: project.status
+    });
+
+  } catch (error) {
+    console.error('❌ Approve booking error:', error);
+    res.status(500).json({ 
+      error: 'Failed to approve booking',
+      details: error.message 
+    });
+  }
+});
+
+// ✅ DECLINE BOOKING ROUTE
+app.post('/api/bookings/:id/decline', async (req, res) => {
+  try {
+    console.log(`❌ Declining booking ${req.params.id}`);
+    
+    if (!Project || !Client) {
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
+    }
+
+    const project = await Project.findByPk(req.params.id, { 
+      include: [{ model: Client, as: 'client' }] 
+    });
+    
+    if (!project) {
+      return res.status(404).json({ 
+        error: 'Booking not found' 
+      });
+    }
+
+    // Update project status
+    await project.update({ 
+      status: 'declined'
+    });
+
+    console.log(`❌ Booking ${req.params.id} declined successfully`);
+
+    res.json({ 
+      success: true, 
+      message: 'Booking declined successfully',
+      projectId: project.id,
+      status: project.status
+    });
+
+  } catch (error) {
+    console.error('❌ Decline booking error:', error);
+    res.status(500).json({ 
+      error: 'Failed to decline booking',
+      details: error.message 
+    });
+  }
+});
+
+// ✅ TEST THE ROUTES
+app.get('/api/bookings/:id/test', async (req, res) => {
+  try {
+    console.log(`🧪 Testing booking ${req.params.id}`);
+    
+    if (!Project || !Client) {
+      return res.json({ 
+        error: 'Database models not available',
+        id: req.params.id
+      });
+    }
+
+    const project = await Project.findByPk(req.params.id, { 
+      include: [{ model: Client, as: 'client' }] 
+    });
+    
+    if (!project) {
+      return res.json({ 
+        error: 'Booking not found',
+        id: req.params.id
+      });
+    }
+
+    res.json({
+      success: true,
+      project: {
+        id: project.id,
+        status: project.status,
+        client: project.client?.name,
+        type: project.projectType
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Test booking error:', error);
+    res.status(500).json({ 
+      error: 'Test failed',
+      details: error.message 
+    });
+  }
+});
+
 // Payments test endpoint
 app.get('/api/payments/test-stripe', (req, res) => {
   console.log('💳 Stripe test requested');
