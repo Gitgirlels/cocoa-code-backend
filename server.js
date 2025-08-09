@@ -99,6 +99,7 @@ async function fixDatabaseSchema() {
     return false;
   }
 }
+
 // IMPORT AND USE EXISTING ROUTE FILES
 try {
   const bookingRoutes = require('./routes/bookings');
@@ -281,6 +282,9 @@ app.get('/api/bookings/debug', async (req, res) => {
       return res.json({
         message: 'Database models not available',
         modelsAvailable: false,
+        totalProjects: 0,
+        bookingsByMonth: {},
+        allProjects: [],
         timestamp: new Date().toISOString(),
         routes: [
           'GET /api/health',
@@ -306,26 +310,28 @@ app.get('/api/bookings/debug', async (req, res) => {
       }
     });
     
+    // ✅ ENSURE allProjects IS ALWAYS AN ARRAY WITH PROPER DATA
+    const allProjectsData = projects.map(p => ({
+      id: p.id,
+      projectType: p.projectType,
+      client: p.client ? {
+        name: p.client.name,
+        email: p.client.email
+      } : { name: 'Unknown', email: 'Unknown' },
+      status: p.status,
+      bookingMonth: p.bookingMonth,
+      totalPrice: p.totalPrice,
+      projectSpecs: p.specifications, // ✅ INCLUDE PROJECT SPECS
+      specifications: p.specifications, // ✅ BACKUP FIELD
+      items: p.items || [], // ✅ INCLUDE ITEMS IF AVAILABLE
+      createdAt: p.createdAt
+    }));
+    
     res.json({
       totalProjects: projects.length,
       bookingsByMonth: summary,
-      recentProject: projects[0] ? {
-        id: projects[0].id,
-        type: projects[0].projectType,
-        month: projects[0].bookingMonth,
-        client: projects[0].client?.name,
-        status: projects[0].status,
-        createdAt: projects[0].createdAt
-      } : null,
-      allProjects: projects.map(p => ({
-        id: p.id,
-        type: p.projectType,
-        client: p.client?.name,
-        email: p.client?.email,
-        status: p.status,
-        month: p.bookingMonth,
-        createdAt: p.createdAt
-      })),
+      recentProject: allProjectsData[0] || null,
+      allProjects: allProjectsData, // ✅ ALWAYS AN ARRAY
       modelsAvailable: true,
       timestamp: new Date().toISOString()
     });
@@ -333,26 +339,29 @@ app.get('/api/bookings/debug', async (req, res) => {
     console.error('❌ Debug endpoint error:', error);
     res.status(500).json({ 
       error: error.message,
+      totalProjects: 0,
+      bookingsByMonth: {},
+      allProjects: [], // ✅ ALWAYS RETURN ARRAY EVEN ON ERROR
       timestamp: new Date().toISOString()
     });
   }
 });
 
-// Add these routes to your server.js file after your existing booking routes
+// ✅ BACKUP APPROVE/DECLINE ROUTES (SIMPLIFIED - NO INCLUDES)
+console.log('📝 Setting up backup approve/decline routes...');
 
-// ✅ APPROVE BOOKING ROUTE
+// APPROVE BOOKING - BACKUP ROUTE
 app.post('/api/bookings/:id/approve', async (req, res) => {
   try {
-    console.log(`✅ Approving booking ${req.params.id}`);
+    console.log(`✅ [BACKUP] Approving booking ${req.params.id}`);
     
-    if (!Project || !Client) {
+    if (!Project) {
       return res.status(500).json({ 
         error: 'Database models not available' 
       });
     }
 
-    const project = await Project.findByPk(req.params.id);  // no include
-
+    const project = await Project.findByPk(req.params.id);
     
     if (!project) {
       return res.status(404).json({ 
@@ -365,17 +374,17 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
       status: 'approved'
     });
 
-    console.log(`✅ Booking ${req.params.id} approved successfully`);
+    console.log(`✅ [BACKUP] Booking ${req.params.id} approved successfully`);
 
     res.json({ 
       success: true, 
-      message: 'Booking approved successfully',
+      message: 'Booking approved successfully (backup route)',
       projectId: project.id,
       status: project.status
     });
 
   } catch (error) {
-    console.error('❌ Approve booking error:', error);
+    console.error('❌ [BACKUP] Approve booking error:', error);
     res.status(500).json({ 
       error: 'Failed to approve booking',
       details: error.message 
@@ -383,43 +392,18 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
   }
 });
 
-// ✅ DECLINE BOOKING ROUTE
+// DECLINE BOOKING - BACKUP ROUTE
 app.post('/api/bookings/:id/decline', async (req, res) => {
   try {
-    console.log(`❌ Declining booking ${req.params.id}`);
+    console.log(`❌ [BACKUP] Declining booking ${req.params.id}`);
     
-    if (!Project || !Client) {
+    if (!Project) {
       return res.status(500).json({ 
         error: 'Database models not available' 
       });
     }
-    router.post('/:id/decline', async (req, res) => {
-      try {
-        const project = await Project.findByPk(req.params.id); // no include
-        if (!project) return res.status(404).json({ error: 'Booking not found' });
-    
-        project.status = 'declined';
-        project.payment_status = 'not_charged';
-        await project.save();
-    
-        // Guarded email send
-        try {
-          const { sendDeclineEmail } = require('../services/emailService');
-          if (project.clientId) {
-            const client = await Client.findByPk(project.clientId);
-            if (client) await sendDeclineEmail(client);
-          }
-        } catch (emailError) {
-          console.warn('Decline email failed:', emailError.message);
-        }
-    
-        res.json({ message: 'Booking declined successfully', project });
-      } catch (err) {
-        console.error('Error declining booking:', err);
-        res.status(500).json({ error: 'Failed to decline booking' });
-      }
-    });
-    
+
+    const project = await Project.findByPk(req.params.id);
     
     if (!project) {
       return res.status(404).json({ 
@@ -432,17 +416,17 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
       status: 'declined'
     });
 
-    console.log(`❌ Booking ${req.params.id} declined successfully`);
+    console.log(`❌ [BACKUP] Booking ${req.params.id} declined successfully`);
 
     res.json({ 
       success: true, 
-      message: 'Booking declined successfully',
+      message: 'Booking declined successfully (backup route)',
       projectId: project.id,
       status: project.status
     });
 
   } catch (error) {
-    console.error('❌ Decline booking error:', error);
+    console.error('❌ [BACKUP] Decline booking error:', error);
     res.status(500).json({ 
       error: 'Failed to decline booking',
       details: error.message 
@@ -455,16 +439,14 @@ app.get('/api/bookings/:id/test', async (req, res) => {
   try {
     console.log(`🧪 Testing booking ${req.params.id}`);
     
-    if (!Project || !Client) {
+    if (!Project) {
       return res.json({ 
         error: 'Database models not available',
         id: req.params.id
       });
     }
 
-    const project = await Project.findByPk(req.params.id, { 
-      include: [{ model: Client, as: 'client' }] 
-    });
+    const project = await Project.findByPk(req.params.id);
     
     if (!project) {
       return res.json({ 
@@ -478,7 +460,6 @@ app.get('/api/bookings/:id/test', async (req, res) => {
       project: {
         id: project.id,
         status: project.status,
-        client: project.client?.name,
         type: project.projectType
       }
     });
@@ -522,6 +503,9 @@ app.get('/', (req, res) => {
       '/api/bookings/test',
       '/api/bookings/debug',
       '/api/bookings/availability/:month',
+      '/api/bookings/:id/approve',
+      '/api/bookings/:id/decline',
+      '/api/bookings/:id/test',
       
       // Admin routes
       '/api/admin/login',
@@ -553,7 +537,9 @@ app.get('/', (req, res) => {
         '/api/admin/verify',
         '/api/admin/inquiries',
         '/api/admin/inquiries/:id/status',
-        '/api/admin/stats'
+        '/api/admin/stats',
+        '/api/bookings/:id/approve',
+        '/api/bookings/:id/decline'
       ],
       clients: [
         '/api/clients',
@@ -568,7 +554,8 @@ app.get('/', (req, res) => {
       ],
       testing: [
         '/api/bookings/test',
-        '/api/bookings/debug'
+        '/api/bookings/debug',
+        '/api/bookings/:id/test'
       ]
     }
   });
@@ -596,6 +583,9 @@ app.use('*', (req, res) => {
       'POST /api/bookings/test',
       'GET /api/bookings/debug',
       'GET /api/bookings/availability/:month',
+      'POST /api/bookings/:id/approve',
+      'POST /api/bookings/:id/decline',
+      'GET /api/bookings/:id/test',
       
       // Admin
       'POST /api/admin/login',
@@ -671,6 +661,9 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('  POST /api/bookings/test');
   console.log('  GET  /api/bookings/debug');
   console.log('  GET  /api/bookings/availability/:month');
+  console.log('  POST /api/bookings/:id/approve');
+  console.log('  POST /api/bookings/:id/decline');
+  console.log('  GET  /api/bookings/:id/test');
   console.log('  GET  /api/admin/stats');
   console.log('  GET  /api/clients');
   console.log('  POST /api/payments/create-intent');

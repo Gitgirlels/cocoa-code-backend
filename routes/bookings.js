@@ -10,11 +10,8 @@ try {
 } catch (error) {
   console.error('❌ Models not available:', error.message);
 }
-// 🔧 FIXED AVAILABILITY ROUTE - No more variable reference errors
 
 // Check availability for a month
-
-// ALTERNATIVE SIMPLIFIED VERSION - Even safer:
 router.get('/availability/:month', async (req, res) => {
   const { month } = req.params;
   const decodedMonth = decodeURIComponent(month);
@@ -24,7 +21,7 @@ router.get('/availability/:month', async (req, res) => {
   // ALWAYS return available - no database checks needed
   res.json({ 
     available: true, 
-    currentBookings: 0, // Could get real count if needed, but not for limiting
+    currentBookings: 0,
     month: decodedMonth,
     maxBookings: 999999,
     unlimited: true,
@@ -32,7 +29,7 @@ router.get('/availability/:month', async (req, res) => {
   });
 });
 
-// FIXED: Simplified booking creation with better error handling
+// Create new booking
 router.post('/', async (req, res) => {
   try {
     console.log('📝 Booking request received:', {
@@ -86,8 +83,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    
-
     // Create or find client
     let client;
     try {
@@ -109,10 +104,9 @@ router.post('/', async (req, res) => {
     }
 
     // Create project
-   // Create project
-let project;
-try {
-    const projectData = {
+    let project;
+    try {
+      const projectData = {
         clientId: client.id,
         projectType: projectType || 'service-only',
         specifications: projectSpecs || 'No specifications provided',
@@ -124,10 +118,9 @@ try {
         totalPrice: parseFloat(totalPrice) || 0,
         bookingMonth: bookingMonth || null,
         status: 'pending',
-paymentStatus: 'awaiting_approval',
         // Store encrypted payment token (in production, use proper encryption)
         paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
-    };
+      };
 
       project = await Project.create(projectData);
       console.log('✅ Project created successfully:', project.id);
@@ -148,7 +141,6 @@ paymentStatus: 'awaiting_approval',
       console.log('✅ Booking confirmation email sent');
     } catch (emailError) {
       console.warn('⚠️ Email sending failed but booking was created:', emailError.message);
-      // Don't fail the entire request if email fails
     }
 
     // Success response
@@ -216,22 +208,18 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// Add these routes to your routes/bookings.js file
-
-// Approve booking
+// Approve booking - SIMPLIFIED (NO INCLUDES)
 router.post('/:id/approve', async (req, res) => {
   try {
-    console.log(`✅ Approving booking ${req.params.id}`);
+    console.log(`✅ [ROUTER] Approving booking ${req.params.id}`);
     
-    if (!Project || !Client) {
+    if (!Project) {
       return res.status(500).json({ 
         error: 'Database models not available' 
       });
     }
 
-    const project = await Project.findByPk(req.params.id, { 
-      include: [{ model: Client, as: 'client' }] 
-    });
+    const project = await Project.findByPk(req.params.id);
     
     if (!project) {
       return res.status(404).json({ 
@@ -241,30 +229,20 @@ router.post('/:id/approve', async (req, res) => {
 
     // Update project status
     await project.update({ 
-      status: 'approved',
-      paymentStatus: 'processing_payment' 
+      status: 'approved'
     });
 
-    console.log(`✅ Booking ${req.params.id} approved successfully`);
-
-    // Try to send approval email
-    try {
-      const { sendApprovalEmail } = require('../services/emailService');
-      await sendApprovalEmail(project.toJSON(), project.client);
-      console.log('✅ Approval email sent');
-    } catch (emailError) {
-      console.warn('⚠️ Approval email failed:', emailError.message);
-    }
+    console.log(`✅ [ROUTER] Booking ${req.params.id} approved successfully`);
 
     res.json({ 
       success: true, 
-      message: 'Booking approved successfully',
+      message: 'Booking approved successfully (router)',
       projectId: project.id,
       status: project.status
     });
 
   } catch (error) {
-    console.error('❌ Approve booking error:', error);
+    console.error('❌ [ROUTER] Approve booking error:', error);
     res.status(500).json({ 
       error: 'Failed to approve booking',
       details: error.message 
@@ -272,44 +250,18 @@ router.post('/:id/approve', async (req, res) => {
   }
 });
 
-// Decline booking
+// Decline booking - SIMPLIFIED (NO INCLUDES)
 router.post('/:id/decline', async (req, res) => {
   try {
-    console.log(`❌ Declining booking ${req.params.id}`);
+    console.log(`❌ [ROUTER] Declining booking ${req.params.id}`);
     
-    if (!Project || !Client) {
+    if (!Project) {
       return res.status(500).json({ 
         error: 'Database models not available' 
       });
     }
 
-    router.post('/:id/decline', async (req, res) => {
-      try {
-        const project = await Project.findByPk(req.params.id); // no include
-        if (!project) return res.status(404).json({ error: 'Booking not found' });
-    
-        project.status = 'declined';
-        project.payment_status = 'not_charged';
-        await project.save();
-    
-        // Guarded email send
-        try {
-          const { sendDeclineEmail } = require('../services/emailService');
-          if (project.clientId) {
-            const client = await Client.findByPk(project.clientId);
-            if (client) await sendDeclineEmail(client);
-          }
-        } catch (emailError) {
-          console.warn('Decline email failed:', emailError.message);
-        }
-    
-        res.json({ message: 'Booking declined successfully', project });
-      } catch (err) {
-        console.error('Error declining booking:', err);
-        res.status(500).json({ error: 'Failed to decline booking' });
-      }
-    });
-    
+    const project = await Project.findByPk(req.params.id);
     
     if (!project) {
       return res.status(404).json({ 
@@ -319,30 +271,20 @@ router.post('/:id/decline', async (req, res) => {
 
     // Update project status
     await project.update({ 
-      status: 'declined',
-      paymentStatus: 'not_charged' 
+      status: 'declined'
     });
 
-    console.log(`❌ Booking ${req.params.id} declined successfully`);
-
-    // Try to send decline email
-    try {
-      const { sendDeclineEmail } = require('../services/emailService');
-      await sendDeclineEmail(project.client);
-      console.log('📧 Decline email sent');
-    } catch (emailError) {
-      console.warn('⚠️ Decline email failed:', emailError.message);
-    }
+    console.log(`❌ [ROUTER] Booking ${req.params.id} declined successfully`);
 
     res.json({ 
       success: true, 
-      message: 'Booking declined successfully',
+      message: 'Booking declined successfully (router)',
       projectId: project.id,
       status: project.status
     });
 
   } catch (error) {
-    console.error('❌ Decline booking error:', error);
+    console.error('❌ [ROUTER] Decline booking error:', error);
     res.status(500).json({ 
       error: 'Failed to decline booking',
       details: error.message 
@@ -351,8 +293,6 @@ router.post('/:id/decline', async (req, res) => {
 });
 
 // Debug endpoint
-// Replace your debug endpoint in routes/bookings.js with this fixed version
-
 router.get('/debug', async (req, res) => {
   try {
     if (!Project || !Client) {
