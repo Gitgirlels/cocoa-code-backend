@@ -283,9 +283,33 @@ router.post('/:id/decline', async (req, res) => {
       });
     }
 
-    const project = await Project.findByPk(req.params.id, { 
-      include: [{ model: Client, as: 'client' }] 
+    router.post('/:id/decline', async (req, res) => {
+      try {
+        const project = await Project.findByPk(req.params.id); // no include
+        if (!project) return res.status(404).json({ error: 'Booking not found' });
+    
+        project.status = 'declined';
+        project.payment_status = 'not_charged';
+        await project.save();
+    
+        // Guarded email send
+        try {
+          const { sendDeclineEmail } = require('../services/emailService');
+          if (project.clientId) {
+            const client = await Client.findByPk(project.clientId);
+            if (client) await sendDeclineEmail(client);
+          }
+        } catch (emailError) {
+          console.warn('Decline email failed:', emailError.message);
+        }
+    
+        res.json({ message: 'Booking declined successfully', project });
+      } catch (err) {
+        console.error('Error declining booking:', err);
+        res.status(500).json({ error: 'Failed to decline booking' });
+      }
     });
+    
     
     if (!project) {
       return res.status(404).json({ 
