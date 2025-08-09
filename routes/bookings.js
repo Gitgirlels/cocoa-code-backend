@@ -263,6 +263,9 @@ router.get('/debug', async (req, res) => {
       return res.json({
         message: 'Database models not available',
         modelsAvailable: false,
+        totalProjects: 0,
+        bookingsByMonth: {},
+        allProjects: [], // 🔧 ENSURE THIS IS ALWAYS AN ARRAY
         timestamp: new Date().toISOString()
       });
     }
@@ -291,6 +294,15 @@ router.get('/debug', async (req, res) => {
         status: projects[0].status,
         createdAt: projects[0].createdAt
       } : null,
+      allProjects: projects.map(p => ({ // 🔧 ENSURE THIS IS ALWAYS AN ARRAY
+        id: p.id,
+        type: p.projectType,
+        client: p.client?.name,
+        email: p.client?.email,
+        status: p.status,
+        month: p.bookingMonth,
+        createdAt: p.createdAt
+      })),
       modelsAvailable: true,
       timestamp: new Date().toISOString()
     });
@@ -298,6 +310,9 @@ router.get('/debug', async (req, res) => {
     console.error('❌ Debug endpoint error:', error);
     res.status(500).json({ 
       error: error.message,
+      totalProjects: 0,
+      bookingsByMonth: {},
+      allProjects: [], // 🔧 ENSURE THIS IS ALWAYS AN ARRAY EVEN ON ERROR
       timestamp: new Date().toISOString()
     });
   }
