@@ -216,47 +216,119 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// Approve
+// Add these routes to your routes/bookings.js file
+
+// Approve booking
 router.post('/:id/approve', async (req, res) => {
   try {
-    const project = await Project.findByPk(req.params.id, { include: [Client] });
-    if (!project) return res.status(404).json({ error: 'Booking not found' });
+    console.log(`✅ Approving booking ${req.params.id}`);
+    
+    if (!Project || !Client) {
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
+    }
 
-    project.status = 'approved';
-    project.paymentStatus = 'processing_payment';
-    await project.save();
+    const project = await Project.findByPk(req.params.id, { 
+      include: [{ model: Client, as: 'client' }] 
+    });
+    
+    if (!project) {
+      return res.status(404).json({ 
+        error: 'Booking not found' 
+      });
+    }
 
-    // Send email
-    await sendApprovalEmail(project.toJSON(), project.Client);
+    // Update project status
+    await project.update({ 
+      status: 'approved',
+      paymentStatus: 'processing_payment' 
+    });
 
-    res.json({ success: true, message: 'Booking approved and customer notified.' });
+    console.log(`✅ Booking ${req.params.id} approved successfully`);
+
+    // Try to send approval email
+    try {
+      const { sendApprovalEmail } = require('../services/emailService');
+      await sendApprovalEmail(project.toJSON(), project.client);
+      console.log('✅ Approval email sent');
+    } catch (emailError) {
+      console.warn('⚠️ Approval email failed:', emailError.message);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Booking approved successfully',
+      projectId: project.id,
+      status: project.status
+    });
+
   } catch (error) {
-    res.status(500).json({ error: 'Failed to approve booking' });
+    console.error('❌ Approve booking error:', error);
+    res.status(500).json({ 
+      error: 'Failed to approve booking',
+      details: error.message 
+    });
   }
 });
 
-
-// Decline
+// Decline booking
 router.post('/:id/decline', async (req, res) => {
   try {
-    const project = await Project.findByPk(req.params.id, { include: [Client] });
-    if (!project) return res.status(404).json({ error: 'Booking not found' });
+    console.log(`❌ Declining booking ${req.params.id}`);
+    
+    if (!Project || !Client) {
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
+    }
 
-    project.status = 'declined';
-    project.paymentStatus = 'not_charged';
-    await project.save();
+    const project = await Project.findByPk(req.params.id, { 
+      include: [{ model: Client, as: 'client' }] 
+    });
+    
+    if (!project) {
+      return res.status(404).json({ 
+        error: 'Booking not found' 
+      });
+    }
 
-    // Send email
-    await sendDeclineEmail(project.Client);
+    // Update project status
+    await project.update({ 
+      status: 'declined',
+      paymentStatus: 'not_charged' 
+    });
 
-    res.json({ success: true, message: 'Booking declined and customer notified.' });
+    console.log(`❌ Booking ${req.params.id} declined successfully`);
+
+    // Try to send decline email
+    try {
+      const { sendDeclineEmail } = require('../services/emailService');
+      await sendDeclineEmail(project.client);
+      console.log('📧 Decline email sent');
+    } catch (emailError) {
+      console.warn('⚠️ Decline email failed:', emailError.message);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Booking declined successfully',
+      projectId: project.id,
+      status: project.status
+    });
+
   } catch (error) {
-    res.status(500).json({ error: 'Failed to decline booking' });
+    console.error('❌ Decline booking error:', error);
+    res.status(500).json({ 
+      error: 'Failed to decline booking',
+      details: error.message 
+    });
   }
 });
 
-
 // Debug endpoint
+// Replace your debug endpoint in routes/bookings.js with this fixed version
+
 router.get('/debug', async (req, res) => {
   try {
     if (!Project || !Client) {
@@ -265,7 +337,7 @@ router.get('/debug', async (req, res) => {
         modelsAvailable: false,
         totalProjects: 0,
         bookingsByMonth: {},
-        allProjects: [], // 🔧 ENSURE THIS IS ALWAYS AN ARRAY
+        allProjects: [], // ✅ ALWAYS RETURN ARRAY
         timestamp: new Date().toISOString()
       });
     }
@@ -283,26 +355,28 @@ router.get('/debug', async (req, res) => {
       }
     });
     
+    // ✅ ENSURE allProjects IS ALWAYS AN ARRAY WITH PROPER DATA
+    const allProjectsData = projects.map(p => ({
+      id: p.id,
+      projectType: p.projectType,
+      client: p.client ? {
+        name: p.client.name,
+        email: p.client.email
+      } : { name: 'Unknown', email: 'Unknown' },
+      status: p.status,
+      bookingMonth: p.bookingMonth,
+      totalPrice: p.totalPrice,
+      projectSpecs: p.specifications, // ✅ INCLUDE PROJECT SPECS
+      specifications: p.specifications, // ✅ BACKUP FIELD
+      items: p.items || [], // ✅ INCLUDE ITEMS IF AVAILABLE
+      createdAt: p.createdAt
+    }));
+    
     res.json({
       totalProjects: projects.length,
       bookingsByMonth: summary,
-      recentProject: projects[0] ? {
-        id: projects[0].id,
-        type: projects[0].projectType,
-        month: projects[0].bookingMonth,
-        client: projects[0].client?.name,
-        status: projects[0].status,
-        createdAt: projects[0].createdAt
-      } : null,
-      allProjects: projects.map(p => ({ // 🔧 ENSURE THIS IS ALWAYS AN ARRAY
-        id: p.id,
-        type: p.projectType,
-        client: p.client?.name,
-        email: p.client?.email,
-        status: p.status,
-        month: p.bookingMonth,
-        createdAt: p.createdAt
-      })),
+      recentProject: allProjectsData[0] || null,
+      allProjects: allProjectsData, // ✅ ALWAYS AN ARRAY
       modelsAvailable: true,
       timestamp: new Date().toISOString()
     });
@@ -312,7 +386,7 @@ router.get('/debug', async (req, res) => {
       error: error.message,
       totalProjects: 0,
       bookingsByMonth: {},
-      allProjects: [], // 🔧 ENSURE THIS IS ALWAYS AN ARRAY EVEN ON ERROR
+      allProjects: [], // ✅ ALWAYS RETURN ARRAY EVEN ON ERROR
       timestamp: new Date().toISOString()
     });
   }
