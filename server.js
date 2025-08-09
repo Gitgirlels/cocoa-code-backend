@@ -350,86 +350,242 @@ app.get('/api/bookings/debug', async (req, res) => {
 // ✅ BACKUP APPROVE/DECLINE ROUTES (SIMPLIFIED - NO INCLUDES)
 console.log('📝 Setting up backup approve/decline routes...');
 
-// APPROVE BOOKING - BACKUP ROUTE
-app.post('/api/bookings/:id/approve', async (req, res) => {
+// QUICK FIX: Add this to your server.js file
+// This adds better error handling to your existing decline route
+
+// ✅ ENHANCED DECLINE ROUTE - Add this to replace your existing decline route
+app.post('/api/bookings/:id/decline', async (req, res) => {
   try {
-    console.log(`✅ [BACKUP] Approving booking ${req.params.id}`);
+    console.log(`❌ [DECLINE] Processing booking ${req.params.id}`);
     
+    // Validate booking ID
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) {
+      console.error('❌ Invalid booking ID:', req.params.id);
+      return res.status(400).json({ 
+        error: 'Invalid booking ID',
+        received: req.params.id
+      });
+    }
+    
+    // Check if database models are available
     if (!Project) {
+      console.error('❌ Project model not available');
       return res.status(500).json({ 
-        error: 'Database models not available' 
+        error: 'Database models not available',
+        details: 'Project model is undefined'
       });
     }
 
-    const project = await Project.findByPk(req.params.id);
+    // Test database connection first
+    try {
+      await sequelize.authenticate();
+      console.log('✅ Database connection verified for decline');
+    } catch (dbTestError) {
+      console.error('❌ Database connection test failed:', dbTestError.message);
+      return res.status(500).json({ 
+        error: 'Database connection failed',
+        details: 'Unable to connect to database'
+      });
+    }
+
+    // Find the project with detailed error handling
+    let project;
+    try {
+      project = await Project.findByPk(projectId);
+      console.log('📋 Project lookup result:', project ? `Found ID ${project.id}` : 'Not found');
+    } catch (findError) {
+      console.error('❌ Database error finding project:', findError.message);
+      console.error('Full error:', findError);
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        details: findError.message
+      });
+    }
     
     if (!project) {
+      console.log(`❌ Booking ${projectId} not found in database`);
       return res.status(404).json({ 
-        error: 'Booking not found' 
+        error: 'Booking not found',
+        id: projectId,
+        message: 'No booking exists with this ID'
       });
     }
 
-    // Update project status
-    await project.update({ 
-      status: 'approved'
-    });
+    console.log(`📋 Found booking ${projectId}, current status: ${project.status}`);
 
-    console.log(`✅ [BACKUP] Booking ${req.params.id} approved successfully`);
+    // Update project status with detailed error handling
+    try {
+      const updateResult = await project.update({ 
+        status: 'declined'
+      });
+      
+      console.log(`✅ Booking ${projectId} status updated to 'declined'`);
+      console.log('Update result:', updateResult.status);
+      
+    } catch (updateError) {
+      console.error('❌ Failed to update project status:', updateError.message);
+      console.error('Full update error:', updateError);
+      return res.status(500).json({ 
+        error: 'Failed to update booking status',
+        details: updateError.message
+      });
+    }
 
-    res.json({ 
+    // Try to send decline email (don't fail if this doesn't work)
+    try {
+      if (Client) {
+        const client = await Client.findByPk(project.clientId);
+        if (client) {
+          const { sendDeclineEmail } = require('./services/emailService');
+          await sendDeclineEmail(client);
+          console.log('📩 Decline email sent successfully');
+        } else {
+          console.warn('⚠️ Client not found for email notification');
+        }
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Decline email failed (but booking was declined):', emailError.message);
+    }
+
+    // Success response
+    const response = {
       success: true, 
-      message: 'Booking approved successfully (backup route)',
+      message: 'Booking declined successfully',
       projectId: project.id,
-      status: project.status
-    });
+      status: project.status,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log(`🎉 Decline completed successfully:`, response);
+    res.json(response);
 
   } catch (error) {
-    console.error('❌ [BACKUP] Approve booking error:', error);
+    console.error('❌ [DECLINE] Unexpected error:', error.message);
+    console.error('Full error stack:', error.stack);
+    console.error('Request details:', {
+      id: req.params.id,
+      body: req.body,
+      headers: req.headers
+    });
+    
     res.status(500).json({ 
-      error: 'Failed to approve booking',
-      details: error.message 
+      error: 'Unexpected error during decline',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-// DECLINE BOOKING - BACKUP ROUTE
-app.post('/api/bookings/:id/decline', async (req, res) => {
+// ✅ ENHANCED APPROVE ROUTE - Add this to replace your existing approve route  
+app.post('/api/bookings/:id/approve', async (req, res) => {
   try {
-    console.log(`❌ [BACKUP] Declining booking ${req.params.id}`);
+    console.log(`✅ [APPROVE] Processing booking ${req.params.id}`);
     
+    // Validate booking ID
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId)) {
+      console.error('❌ Invalid booking ID:', req.params.id);
+      return res.status(400).json({ 
+        error: 'Invalid booking ID',
+        received: req.params.id
+      });
+    }
+    
+    // Check if database models are available
     if (!Project) {
+      console.error('❌ Project model not available');
       return res.status(500).json({ 
-        error: 'Database models not available' 
+        error: 'Database models not available',
+        details: 'Project model is undefined'
       });
     }
 
-    const project = await Project.findByPk(req.params.id);
+    // Test database connection first
+    try {
+      await sequelize.authenticate();
+      console.log('✅ Database connection verified for approval');
+    } catch (dbTestError) {
+      console.error('❌ Database connection test failed:', dbTestError.message);
+      return res.status(500).json({ 
+        error: 'Database connection failed',
+        details: 'Unable to connect to database'
+      });
+    }
+
+    // Find the project with detailed error handling
+    let project;
+    try {
+      project = await Project.findByPk(projectId);
+      console.log('📋 Project lookup result:', project ? `Found ID ${project.id}` : 'Not found');
+    } catch (findError) {
+      console.error('❌ Database error finding project:', findError.message);
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        details: findError.message
+      });
+    }
     
     if (!project) {
+      console.log(`❌ Booking ${projectId} not found in database`);
       return res.status(404).json({ 
-        error: 'Booking not found' 
+        error: 'Booking not found',
+        id: projectId,
+        message: 'No booking exists with this ID'
       });
     }
 
-    // Update project status
-    await project.update({ 
-      status: 'declined'
-    });
+    console.log(`📋 Found booking ${projectId}, current status: ${project.status}`);
 
-    console.log(`❌ [BACKUP] Booking ${req.params.id} declined successfully`);
+    // Update project status with detailed error handling
+    try {
+      await project.update({ 
+        status: 'approved'
+      });
+      
+      console.log(`✅ Booking ${projectId} status updated to 'approved'`);
+      
+    } catch (updateError) {
+      console.error('❌ Failed to update project status:', updateError.message);
+      return res.status(500).json({ 
+        error: 'Failed to update booking status',
+        details: updateError.message
+      });
+    }
 
+    // Try to send approval email (don't fail if this doesn't work)
+    try {
+      if (Client) {
+        const client = await Client.findByPk(project.clientId);
+        if (client) {
+          const { sendApprovalEmail } = require('./services/emailService');
+          await sendApprovalEmail(project, client);
+          console.log('✅ Approval email sent successfully');
+        } else {
+          console.warn('⚠️ Client not found for email notification');
+        }
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Approval email failed (but booking was approved):', emailError.message);
+    }
+
+    // Success response
     res.json({ 
       success: true, 
-      message: 'Booking declined successfully (backup route)',
+      message: 'Booking approved successfully',
       projectId: project.id,
-      status: project.status
+      status: project.status,
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('❌ [BACKUP] Decline booking error:', error);
+    console.error('❌ [APPROVE] Unexpected error:', error.message);
+    console.error('Full error stack:', error.stack);
+    
     res.status(500).json({ 
-      error: 'Failed to decline booking',
-      details: error.message 
+      error: 'Unexpected error during approval',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
