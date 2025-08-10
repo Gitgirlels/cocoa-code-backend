@@ -251,46 +251,75 @@ router.post('/:id/approve', async (req, res) => {
 });
 
 // Decline booking - SIMPLIFIED (NO INCLUDES)
+// Decline booking - ROBUST + GUARDED EMAIL + CLEAR LOGS
 router.post('/:id/decline', async (req, res) => {
   try {
     console.log(`❌ [ROUTER] Declining booking ${req.params.id}`);
-    
+
+    // 1) Validate ID
+    const projectId = parseInt(req.params.id, 10);
+    if (Number.isNaN(projectId)) {
+      console.error('❌ Invalid booking ID:', req.params.id);
+      return res.status(400).json({ error: 'Invalid booking ID', received: req.params.id });
+    }
+
+    // 2) Ensure models exist
     if (!Project) {
-      return res.status(500).json({ 
-        error: 'Database models not available' 
-      });
+      console.error('❌ Project model not available');
+      return res.status(500).json({ error: 'Database models not available' });
     }
 
-    const project = await Project.findByPk(req.params.id);
-    
+    // 3) Lookup without includes (avoid brittle associations)
+    let project;
+    try {
+      project = await Project.findByPk(projectId);
+      console.log('📋 Project lookup:', project ? `Found ID ${project.id}` : 'Not found');
+    } catch (findErr) {
+      console.error('❌ DB error on findByPk:', findErr.message);
+      return res.status(500).json({ error: 'Database query failed', details: findErr.message });
+    }
+
     if (!project) {
-      return res.status(404).json({ 
-        error: 'Booking not found' 
-      });
+      return res.status(404).json({ error: 'Booking not found', id: projectId });
     }
 
-    // Update project status
-    await project.update({ 
-      status: 'declined'
-    });
+    // 4) Update status only
+    try {
+      await project.update({ status: 'declined' });
+      console.log(`✅ Booking ${projectId} status updated -> declined`);
+    } catch (updErr) {
+      console.error('❌ Failed to update project status:', updErr.message);
+      return res.status(500).json({ error: 'Failed to update booking status', details: updErr.message });
+    }
 
-    console.log(`❌ [ROUTER] Booking ${req.params.id} declined successfully`);
+    // 5) Non-fatal, guarded email send
+    try {
+      if (Client && project.clientId) {
+        const client = await Client.findByPk(project.clientId);
+        if (client) {
+          const { sendDeclineEmail } = require('../services/emailService');
+          await sendDeclineEmail(client);
+          console.log('📩 Decline email sent');
+        }
+      }
+    } catch (emailErr) {
+      console.warn('⚠️ Decline email failed (non-fatal):', emailErr.message);
+    }
 
-    res.json({ 
-      success: true, 
+    // 6) Success
+    return res.json({
+      success: true,
       message: 'Booking declined successfully (router)',
       projectId: project.id,
       status: project.status
     });
 
-  } catch (error) {
-    console.error('❌ [ROUTER] Decline booking error:', error);
-    res.status(500).json({ 
-      error: 'Failed to decline booking',
-      details: error.message 
-    });
+  } catch (err) {
+    console.error('❌ [ROUTER] Decline booking unexpected error:', err);
+    return res.status(500).json({ error: 'Unexpected error during decline', details: err.message });
   }
 });
+
 
 // Debug endpoint
 router.get('/debug', async (req, res) => {
