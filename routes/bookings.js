@@ -209,7 +209,7 @@ router.post('/test', async (req, res) => {
 });
 
 // Approve booking - SIMPLIFIED (NO INCLUDES)
-router.post('/:id/approve', async (req, res) => {
+/*router.post('/:id/approve', async (req, res) => {
   try {
     console.log(`✅ [ROUTER] Approving booking ${req.params.id}`);
     
@@ -320,6 +320,7 @@ router.post('/:id/decline', async (req, res) => {
   }
 });
 
+*/
 
 // Debug endpoint
 router.get('/debug', async (req, res) => {
