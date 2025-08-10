@@ -208,10 +208,19 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// Approve booking - SIMPLIFIED (NO INCLUDES)
-/*router.post('/:id/approve', async (req, res) => {
+// ✅ FIXED APPROVE ROUTE - Enhanced error handling
+router.post('/:id/approve', async (req, res) => {
   try {
     console.log(`✅ [ROUTER] Approving booking ${req.params.id}`);
+    
+    // Validate booking ID
+    const projectId = parseInt(req.params.id, 10);
+    if (isNaN(projectId) || projectId <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid booking ID',
+        received: req.params.id
+      });
+    }
     
     if (!Project) {
       return res.status(500).json({ 
@@ -219,26 +228,100 @@ router.post('/test', async (req, res) => {
       });
     }
 
-    const project = await Project.findByPk(req.params.id);
+    // Find project with error handling
+    let project;
+    try {
+      project = await Project.findByPk(projectId);
+      console.log('📋 Project lookup:', project ? `Found ID ${project.id}` : 'Not found');
+    } catch (findError) {
+      console.error('❌ Database error finding project:', findError.message);
+      return res.status(500).json({ 
+        error: 'Database query failed',
+        details: findError.message 
+      });
+    }
     
     if (!project) {
       return res.status(404).json({ 
-        error: 'Booking not found' 
+        error: 'Booking not found',
+        id: projectId
       });
     }
 
-    // Update project status
-    await project.update({ 
-      status: 'approved'
-    });
+    console.log(`📋 Current status: ${project.status}, updating to approved`);
 
-    console.log(`✅ [ROUTER] Booking ${req.params.id} approved successfully`);
+    // Update project status with multiple methods
+    let updateSuccess = false;
+    let finalStatus = null;
+
+    // Method 1: Standard Sequelize update
+    try {
+      await project.update({ status: 'approved' });
+      await project.reload();
+      finalStatus = project.status;
+      updateSuccess = true;
+      console.log('✅ Method 1 (Sequelize update) succeeded');
+    } catch (updateError1) {
+      console.warn('⚠️ Method 1 failed:', updateError1.message);
+      
+      // Method 2: Direct property update + save
+      try {
+        project.status = 'approved';
+        await project.save();
+        finalStatus = project.status;
+        updateSuccess = true;
+        console.log('✅ Method 2 (direct save) succeeded');
+      } catch (updateError2) {
+        console.warn('⚠️ Method 2 failed:', updateError2.message);
+        
+        // Method 3: Raw SQL update
+        try {
+          const { sequelize } = require('../models');
+          await sequelize.query(
+            'UPDATE projects SET status = :status WHERE id = :id',
+            {
+              replacements: { status: 'approved', id: projectId },
+              type: sequelize.QueryTypes.UPDATE
+            }
+          );
+          
+          finalStatus = 'approved';
+          updateSuccess = true;
+          console.log('✅ Method 3 (raw SQL) succeeded');
+        } catch (updateError3) {
+          console.error('❌ All update methods failed:', updateError3.message);
+        }
+      }
+    }
+
+    if (!updateSuccess) {
+      return res.status(500).json({ 
+        error: 'Failed to update booking status',
+        details: 'All update methods failed'
+      });
+    }
+
+    console.log(`✅ [ROUTER] Booking ${projectId} approved successfully`);
+
+    // Try to send approval email (optional)
+    try {
+      if (Client) {
+        const client = await Client.findByPk(project.clientId);
+        if (client) {
+          const { sendApprovalEmail } = require('../services/emailService');
+          await sendApprovalEmail(project, client);
+          console.log('✅ Approval email sent');
+        }
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Approval email failed:', emailError.message);
+    }
 
     res.json({ 
       success: true, 
       message: 'Booking approved successfully (router)',
       projectId: project.id,
-      status: project.status
+      status: finalStatus
     });
 
   } catch (error) {
@@ -250,49 +333,105 @@ router.post('/test', async (req, res) => {
   }
 });
 
-// Decline booking - SIMPLIFIED (NO INCLUDES)
-// Decline booking - ROBUST + GUARDED EMAIL + CLEAR LOGS
+// ✅ FIXED DECLINE ROUTE - Enhanced error handling
 router.post('/:id/decline', async (req, res) => {
   try {
     console.log(`❌ [ROUTER] Declining booking ${req.params.id}`);
 
-    // 1) Validate ID
+    // Validate booking ID
     const projectId = parseInt(req.params.id, 10);
-    if (Number.isNaN(projectId)) {
+    if (isNaN(projectId) || projectId <= 0) {
       console.error('❌ Invalid booking ID:', req.params.id);
-      return res.status(400).json({ error: 'Invalid booking ID', received: req.params.id });
+      return res.status(400).json({ 
+        error: 'Invalid booking ID', 
+        received: req.params.id 
+      });
     }
 
-    // 2) Ensure models exist
+    // Ensure models exist
     if (!Project) {
       console.error('❌ Project model not available');
-      return res.status(500).json({ error: 'Database models not available' });
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
     }
 
-    // 3) Lookup without includes (avoid brittle associations)
+    // Find project without includes (avoid association issues)
     let project;
     try {
       project = await Project.findByPk(projectId);
       console.log('📋 Project lookup:', project ? `Found ID ${project.id}` : 'Not found');
     } catch (findErr) {
       console.error('❌ DB error on findByPk:', findErr.message);
-      return res.status(500).json({ error: 'Database query failed', details: findErr.message });
+      return res.status(500).json({ 
+        error: 'Database query failed', 
+        details: findErr.message 
+      });
     }
 
     if (!project) {
-      return res.status(404).json({ error: 'Booking not found', id: projectId });
+      return res.status(404).json({ 
+        error: 'Booking not found', 
+        id: projectId 
+      });
     }
 
-    // 4) Update status only
+    console.log(`📋 Current status: ${project.status}, updating to declined`);
+
+    // Update status with multiple fallback methods
+    let updateSuccess = false;
+    let finalStatus = null;
+
+    // Method 1: Standard Sequelize update
     try {
       await project.update({ status: 'declined' });
-      console.log(`✅ Booking ${projectId} status updated -> declined`);
-    } catch (updErr) {
-      console.error('❌ Failed to update project status:', updErr.message);
-      return res.status(500).json({ error: 'Failed to update booking status', details: updErr.message });
+      await project.reload();
+      finalStatus = project.status;
+      updateSuccess = true;
+      console.log('✅ Method 1 (Sequelize update) succeeded');
+    } catch (updateError1) {
+      console.warn('⚠️ Method 1 failed:', updateError1.message);
+      
+      // Method 2: Direct property update + save
+      try {
+        project.status = 'declined';
+        await project.save();
+        finalStatus = project.status;
+        updateSuccess = true;
+        console.log('✅ Method 2 (direct save) succeeded');
+      } catch (updateError2) {
+        console.warn('⚠️ Method 2 failed:', updateError2.message);
+        
+        // Method 3: Raw SQL update as last resort
+        try {
+          const { sequelize } = require('../models');
+          await sequelize.query(
+            'UPDATE projects SET status = :status WHERE id = :id',
+            {
+              replacements: { status: 'declined', id: projectId },
+              type: sequelize.QueryTypes.UPDATE
+            }
+          );
+          
+          finalStatus = 'declined';
+          updateSuccess = true;
+          console.log('✅ Method 3 (raw SQL) succeeded');
+        } catch (updateError3) {
+          console.error('❌ All update methods failed:', updateError3.message);
+        }
+      }
     }
 
-    // 5) Non-fatal, guarded email send
+    if (!updateSuccess) {
+      return res.status(500).json({ 
+        error: 'Failed to update booking status',
+        details: 'All update methods failed'
+      });
+    }
+
+    console.log(`✅ Booking ${projectId} status updated -> declined`);
+
+    // Try to send decline email (non-fatal)
     try {
       if (Client && project.clientId) {
         const client = await Client.findByPk(project.clientId);
@@ -306,21 +445,22 @@ router.post('/:id/decline', async (req, res) => {
       console.warn('⚠️ Decline email failed (non-fatal):', emailErr.message);
     }
 
-    // 6) Success
+    // Success response
     return res.json({
       success: true,
       message: 'Booking declined successfully (router)',
       projectId: project.id,
-      status: project.status
+      status: finalStatus
     });
 
   } catch (err) {
     console.error('❌ [ROUTER] Decline booking unexpected error:', err);
-    return res.status(500).json({ error: 'Unexpected error during decline', details: err.message });
+    return res.status(500).json({ 
+      error: 'Unexpected error during decline', 
+      details: err.message 
+    });
   }
 });
-
-*/
 
 // Debug endpoint
 router.get('/debug', async (req, res) => {
