@@ -8,9 +8,16 @@ const PORT = process.env.PORT || 5000;
 // Trust proxy for Railway
 app.set('trust proxy', true);
 
-// CORS setup - Very permissive for debugging
+// UPDATED CORS - Add to server.js
 app.use(cors({
-  origin: '*',
+  origin: [
+    'https://cocoacode.dev',
+    'https://www.cocoacode.dev', 
+    'http://localhost:3000',
+    'http://localhost:5000',
+    // Keep old domain during transition
+    'https://cocoa-code.netlify.app'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
   credentials: true
