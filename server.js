@@ -14,7 +14,8 @@ app.use(cors({
     'https://cocoacode.dev',
     'https://www.cocoacode.dev', 
     'http://localhost:3000',
-    'http://localhost:5000'
+    'http://localhost:5000',
+    'https://cocoa-code.netlify.app'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
