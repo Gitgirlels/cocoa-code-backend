@@ -3,27 +3,41 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
 
-// Trust proxy for Railway
-app.set('trust proxy', true);
+app.enable('trust proxy'); // Railway / proxies
 
-// UPDATED CORS - Add to server.js
-app.use(cors({
-  origin: [
-    'https://cocoacode.dev',
-    'https://www.cocoacode.dev', 
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'https://cocoa-code.netlify.app'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
-  credentials: true
-}));
+// Allowlist: add/remove as you need
+const allowlist = [
+  'https://www.cocoacode.dev',
+  'https://cocoacode.dev',            // harmless even if apex redirects
+  'https://cocoa-code.netlify.app',   // Netlify production/preview
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5500',
+  'http://localhost:5500'
+];
 
-// Handle preflight requests
-app.options('*', cors());
+const corsOptions = {
+  origin(origin, cb) {
+    if (!origin) return cb(null, true);           // curl/Postman/no-origin
+    return cb(null, allowlist.includes(origin));  // true => allowed, false => blocked
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  maxAge: 86400,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // preflight with same rules
+
+// (Optional) force HTTPS in production
+app.use((req, res, next) => {
+  const xf = req.headers['x-forwarded-proto'];
+  if (req.secure || xf === 'https') return next();
+  return res.redirect(308, 'https://' + req.headers.host + req.originalUrl);
+});
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
