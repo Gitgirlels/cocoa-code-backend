@@ -1,14 +1,28 @@
 const nodemailer = require('nodemailer');
 
-const createTransporter = () => {
-  return nodemailer.createTransporter({
-    service: 'gmail',
+// Create a correctly configured Gmail transporter
+const createTransporter = () =>
+  nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT || 465), // 465 = SSL
+    secure: String(process.env.EMAIL_SECURE || 'true') === 'true',
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      user: process.env.EMAIL_USER, // e.g. cocoacodeco@gmail.com
+      pass: process.env.EMAIL_PASS  // 16-char Gmail App Password
     }
   });
-};
+
+// ✅ Run once at boot to check creds/connectivity
+(async () => {
+  try {
+    const t = createTransporter();
+    await t.verify();
+    console.log('✅ SMTP ready to send');
+  } catch (e) {
+    console.error('❌ SMTP verify failed:', e.message);
+  }
+})();
+
 
 // Helper function to build receipt table from items
 const buildReceiptTable = (items, totalPrice) => {
