@@ -377,7 +377,7 @@ console.log('📝 Setting up backup approve/decline routes...');
 // TARGETED FIX: Add this to your server.js to replace the failing routes
 // This fixes the specific "Failed to update booking status" error
 
-// 🎯 FIXED DECLINE ROUTE - Replace your existing decline route with this
+// 🎯 FIXED DECLINE ROUTE WITH EMAIL - Replace your existing decline route
 app.post('/api/bookings/:id/decline', async (req, res) => {
   try {
     console.log(`❌ [DECLINE-FIXED] Processing booking ${req.params.id}`);
@@ -397,10 +397,12 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
       });
     }
 
-    // 🔧 ENHANCED: Use raw SQL as backup if Sequelize update fails
+    // Find the project with client data
     let project;
     try {
-      project = await Project.findByPk(projectId);
+      project = await Project.findByPk(projectId, {
+        include: [{ model: Client, as: 'client' }]
+      });
     } catch (findError) {
       console.error('❌ Find error:', findError.message);
       return res.status(500).json({ 
@@ -425,7 +427,7 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
     // Method 1: Standard Sequelize update
     try {
       await project.update({ status: 'declined' });
-      await project.reload(); // Refresh from database
+      await project.reload();
       finalStatus = project.status;
       updateSuccess = true;
       console.log('✅ Method 1 (Sequelize update) succeeded');
@@ -476,25 +478,47 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
       return res.status(500).json({ 
         error: 'Failed to update booking status',
         details: 'All update methods failed',
-        currentStatus: project.status
+        currentStatus: project.status,
+        emailSent: false
       });
     }
 
     console.log(`🎉 Booking ${projectId} successfully declined. Status: ${finalStatus}`);
 
-    // Try to send email (optional)
+    // 📧 TRY TO SEND DECLINE EMAIL
+    let emailSent = false;
+    let emailError = null;
+
     try {
-      if (Client) {
-        const client = await Client.findByPk(project.clientId);
-        if (client && client.email) {
-          // Only try email if service is available
-          const { sendDeclineEmail } = require('./services/emailService');
-          await sendDeclineEmail(client);
-          console.log('📩 Decline email sent');
-        }
+      if (project.client && project.client.email) {
+        console.log(`📧 Sending decline email to: ${project.client.email}`);
+        
+        const { sendDeclineEmail } = require('./services/emailService');
+        
+        // Call the email service with proper parameters
+        await sendDeclineEmail({
+          to: project.client.email,
+          client: {
+            name: project.client.name,
+            email: project.client.email
+          },
+          project: {
+            id: project.id,
+            projectType: project.projectType,
+            bookingMonth: project.bookingMonth,
+            totalPrice: project.totalPrice
+          }
+        });
+        
+        emailSent = true;
+        console.log('✅ Decline email sent successfully');
+      } else {
+        console.warn('⚠️ No client email found - cannot send decline email');
+        emailError = 'Client email not available';
       }
-    } catch (emailError) {
-      console.warn('⚠️ Email failed (booking still declined):', emailError.message);
+    } catch (emailSendError) {
+      console.error('❌ Email sending failed:', emailSendError.message);
+      emailError = emailSendError.message;
     }
 
     res.json({ 
@@ -502,6 +526,8 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
       message: 'Booking declined successfully',
       projectId: projectId,
       status: finalStatus,
+      emailSent: emailSent,
+      emailError: emailError,
       method: updateSuccess ? 'database_updated' : 'unknown'
     });
 
@@ -509,12 +535,13 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
     console.error('❌ [DECLINE-FIXED] Critical error:', error);
     res.status(500).json({ 
       error: 'Critical system error',
-      details: error.message
+      details: error.message,
+      emailSent: false
     });
   }
 });
 
-// 🎯 FIXED APPROVE ROUTE - Replace your existing approve route with this
+// 🎯 FIXED APPROVE ROUTE WITH EMAIL - Replace your existing approve route
 app.post('/api/bookings/:id/approve', async (req, res) => {
   try {
     console.log(`✅ [APPROVE-FIXED] Processing booking ${req.params.id}`);
@@ -534,10 +561,12 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
       });
     }
 
-    // Find the project
+    // Find the project with client data
     let project;
     try {
-      project = await Project.findByPk(projectId);
+      project = await Project.findByPk(projectId, {
+        include: [{ model: Client, as: 'client' }]
+      });
     } catch (findError) {
       console.error('❌ Find error:', findError.message);
       return res.status(500).json({ 
@@ -613,24 +642,49 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
       return res.status(500).json({ 
         error: 'Failed to update booking status',
         details: 'All update methods failed',
-        currentStatus: project.status
+        currentStatus: project.status,
+        emailSent: false
       });
     }
 
     console.log(`🎉 Booking ${projectId} successfully approved. Status: ${finalStatus}`);
 
-    // Try to send email (optional)
+    // 📧 TRY TO SEND APPROVAL EMAIL
+    let emailSent = false;
+    let emailError = null;
+
     try {
-      if (Client) {
-        const client = await Client.findByPk(project.clientId);
-        if (client && client.email) {
-          const { sendApprovalEmail } = require('./services/emailService');
-          await sendApprovalEmail(project, client);
-          console.log('✅ Approval email sent');
-        }
+      if (project.client && project.client.email) {
+        console.log(`📧 Sending approval email to: ${project.client.email}`);
+        
+        const { sendApprovalEmail } = require('./services/emailService');
+        
+        // Call the email service with proper parameters
+        await sendApprovalEmail({
+          to: project.client.email,
+          client: {
+            name: project.client.name,
+            email: project.client.email
+          },
+          project: {
+            id: project.id,
+            projectType: project.projectType,
+            bookingMonth: project.bookingMonth,
+            totalPrice: project.totalPrice,
+            projectSpecs: project.specifications
+          },
+          projectSpecs: project.specifications
+        });
+        
+        emailSent = true;
+        console.log('✅ Approval email sent successfully');
+      } else {
+        console.warn('⚠️ No client email found - cannot send approval email');
+        emailError = 'Client email not available';
       }
-    } catch (emailError) {
-      console.warn('⚠️ Email failed (booking still approved):', emailError.message);
+    } catch (emailSendError) {
+      console.error('❌ Email sending failed:', emailSendError.message);
+      emailError = emailSendError.message;
     }
 
     res.json({ 
@@ -638,6 +692,8 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
       message: 'Booking approved successfully',
       projectId: projectId,
       status: finalStatus,
+      emailSent: emailSent,
+      emailError: emailError,
       method: updateSuccess ? 'database_updated' : 'unknown'
     });
 
@@ -645,7 +701,107 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
     console.error('❌ [APPROVE-FIXED] Critical error:', error);
     res.status(500).json({ 
       error: 'Critical system error',
-      details: error.message
+      details: error.message,
+      emailSent: false
+    });
+  }
+});
+
+// 📧 ADD EMAIL TEST ROUTE
+app.post('/api/test/email', async (req, res) => {
+  try {
+    console.log('📧 Testing email service...');
+    
+    const { to, type } = req.body;
+    
+    // Test SMTP connection first
+    const { sendEmail } = require('./services/emailService');
+    
+    await sendEmail({
+      to: to || 'test@example.com',
+      subject: '🧪 Cocoa Code - Email Service Test',
+      html: `
+        <div style="font-family: 'Courier New', monospace; padding: 20px; background: #F5F5DC; border-radius: 10px;">
+          <h2 style="color: #8B4513;">🍫 Email Service Test</h2>
+          <p>This is a test email from Cocoa Code backend.</p>
+          <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+          <p><strong>Status:</strong> ✅ Email service is working!</p>
+        </div>
+      `,
+      text: `Cocoa Code Email Service Test - ${new Date().toISOString()} - Email service is working!`
+    });
+    
+    res.json({
+      success: true,
+      message: 'Email service test completed successfully',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Email test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Email service test failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// 🔍 ADD ROUTE TO GET BOOKING DETAILS (for the View Details button)
+app.get('/api/bookings/:id/details', async (req, res) => {
+  try {
+    console.log(`🔍 Getting details for booking ${req.params.id}`);
+    
+    const projectId = parseInt(req.params.id);
+    if (isNaN(projectId) || projectId <= 0) {
+      return res.status(400).json({ 
+        error: 'Invalid booking ID' 
+      });
+    }
+
+    if (!Project) {
+      return res.status(500).json({ 
+        error: 'Database models not available' 
+      });
+    }
+
+    const project = await Project.findByPk(projectId, {
+      include: [{ model: Client, as: 'client' }]
+    });
+    
+    if (!project) {
+      return res.status(404).json({ 
+        error: 'Booking not found' 
+      });
+    }
+
+    res.json({
+      success: true,
+      project: {
+        id: project.id,
+        projectType: project.projectType,
+        status: project.status,
+        bookingMonth: project.bookingMonth,
+        totalPrice: project.totalPrice,
+        projectSpecs: project.specifications,
+        specifications: project.specifications,
+        items: project.items || [],
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt
+      },
+      client: {
+        id: project.client?.id,
+        name: project.client?.name,
+        email: project.client?.email
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get details error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get booking details',
+      details: error.message 
     });
   }
 });
