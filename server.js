@@ -232,6 +232,7 @@ app.post('/api/bookings', async (req, res) => {
           message: 'Booking created successfully and saved to database!',
           projectId: project.id,
           clientId: client.id,
+          emailSent: emailSent, // ✅ Add this line
           bookingDetails: {
             clientName,
             clientEmail,
@@ -259,6 +260,7 @@ app.post('/api/bookings', async (req, res) => {
       message: 'Booking created successfully (test mode - not saved to database)',
       projectId: projectId,
       clientId: clientId,
+      emailSent: emailSent, // ✅ Add this line
       bookingDetails: {
         clientName,
         clientEmail,
@@ -485,40 +487,32 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
 
     console.log(`🎉 Booking ${projectId} successfully declined. Status: ${finalStatus}`);
 
-    // 📧 TRY TO SEND DECLINE EMAIL
+    // Try to send email - FIXED VERSION
     let emailSent = false;
-    let emailError = null;
-
     try {
-      if (project.client && project.client.email) {
-        console.log(`📧 Sending decline email to: ${project.client.email}`);
-        
-        const { sendDeclineEmail } = require('./services/emailService');
-        
-        // Call the email service with proper parameters
-        await sendDeclineEmail({
-          to: project.client.email,
-          client: {
-            name: project.client.name,
-            email: project.client.email
-          },
-          project: {
-            id: project.id,
-            projectType: project.projectType,
-            bookingMonth: project.bookingMonth,
-            totalPrice: project.totalPrice
-          }
-        });
-        
-        emailSent = true;
-        console.log('✅ Decline email sent successfully');
-      } else {
-        console.warn('⚠️ No client email found - cannot send decline email');
-        emailError = 'Client email not available';
-      }
-    } catch (emailSendError) {
-      console.error('❌ Email sending failed:', emailSendError.message);
-      emailError = emailSendError.message;
+      const { sendBookingConfirmation } = require('./services/emailService');
+      
+      // ✅ CORRECT: Call with proper parameters
+      await sendBookingConfirmation({
+        to: client.email,
+        client: {
+          name: client.name,
+          email: client.email
+        },
+        project: {
+          id: project.id,
+          projectType: project.projectType,
+          totalPrice: project.totalPrice,
+          bookingMonth: project.bookingMonth
+        },
+        projectSpecs: project.specifications
+      });
+      
+      emailSent = true;
+      console.log('✅ Booking confirmation email sent successfully');
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError.message);
+      console.error('Email error details:', emailError);
     }
 
     res.json({ 
