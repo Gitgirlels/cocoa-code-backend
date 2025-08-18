@@ -157,7 +157,7 @@ app.get('/api/bookings/availability/:month', (req, res) => {
   });
 });
 
-// POST booking - SIMPLIFIED VERSION (your existing code)
+// POST booking - FIXED VERSION WITH PROPER EMAIL
 app.post('/api/bookings', async (req, res) => {
   console.log('📝 BOOKING REQUEST RECEIVED!');
   
@@ -219,20 +219,39 @@ app.post('/api/bookings', async (req, res) => {
         
         console.log('✅ Project saved to database:', project.id);
         
-        // Try to send email
+        // ✅ FIXED: Try to send booking confirmation email
+        let emailSent = false;
         try {
           const { sendBookingConfirmation } = require('./services/emailService');
-          await sendBookingConfirmation(project, client);
-          console.log('✅ Booking confirmation email sent');
+          
+          // ✅ CORRECT: Call with proper parameters
+          await sendBookingConfirmation({
+            to: client.email,
+            client: {
+              name: client.name,
+              email: client.email
+            },
+            project: {
+              id: project.id,
+              projectType: project.projectType,
+              totalPrice: project.totalPrice,
+              bookingMonth: project.bookingMonth
+            },
+            projectSpecs: project.specifications
+          });
+          
+          emailSent = true;
+          console.log('✅ Booking confirmation email sent successfully');
         } catch (emailError) {
-          console.warn('⚠️ Email sending failed:', emailError.message);
+          console.error('❌ Email sending failed:', emailError.message);
+          console.error('Email error details:', emailError);
         }
         
         return res.status(201).json({
           message: 'Booking created successfully and saved to database!',
           projectId: project.id,
           clientId: client.id,
-          emailSent: emailSent, // ✅ Add this line
+          emailSent: emailSent, // ✅ Fixed: properly declared variable
           bookingDetails: {
             clientName,
             clientEmail,
@@ -260,7 +279,7 @@ app.post('/api/bookings', async (req, res) => {
       message: 'Booking created successfully (test mode - not saved to database)',
       projectId: projectId,
       clientId: clientId,
-      emailSent: emailSent, // ✅ Add this line
+      emailSent: false, // ✅ Fixed: properly declared
       bookingDetails: {
         clientName,
         clientEmail,
@@ -369,17 +388,7 @@ app.get('/api/bookings/debug', async (req, res) => {
   }
 });
 
-// ✅ BACKUP APPROVE/DECLINE ROUTES (SIMPLIFIED - NO INCLUDES)
-console.log('📝 Setting up backup approve/decline routes...');
-
-// QUICK FIX: Add this to your server.js file
-// This adds better error handling to your existing decline route
-
-// ✅ ENHANCED DECLINE ROUTE - Add this to replace your existing decline route
-// TARGETED FIX: Add this to your server.js to replace the failing routes
-// This fixes the specific "Failed to update booking status" error
-
-// 🎯 FIXED DECLINE ROUTE WITH EMAIL - Replace your existing decline route
+// ✅ FIXED DECLINE ROUTE WITH PROPER EMAIL
 app.post('/api/bookings/:id/decline', async (req, res) => {
   try {
     console.log(`❌ [DECLINE-FIXED] Processing booking ${req.params.id}`);
@@ -487,32 +496,40 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
 
     console.log(`🎉 Booking ${projectId} successfully declined. Status: ${finalStatus}`);
 
-    // Try to send email - FIXED VERSION
+    // 📧 TRY TO SEND DECLINE EMAIL - FIXED
     let emailSent = false;
+    let emailError = null;
+
     try {
-      const { sendBookingConfirmation } = require('./services/emailService');
-      
-      // ✅ CORRECT: Call with proper parameters
-      await sendBookingConfirmation({
-        to: client.email,
-        client: {
-          name: client.name,
-          email: client.email
-        },
-        project: {
-          id: project.id,
-          projectType: project.projectType,
-          totalPrice: project.totalPrice,
-          bookingMonth: project.bookingMonth
-        },
-        projectSpecs: project.specifications
-      });
-      
-      emailSent = true;
-      console.log('✅ Booking confirmation email sent successfully');
-    } catch (emailError) {
-      console.error('❌ Email sending failed:', emailError.message);
-      console.error('Email error details:', emailError);
+      if (project.client && project.client.email) {
+        console.log(`📧 Sending decline email to: ${project.client.email}`);
+        
+        const { sendDeclineEmail } = require('./services/emailService');
+        
+        // ✅ CORRECT: Call sendDeclineEmail (not sendBookingConfirmation)
+        await sendDeclineEmail({
+          to: project.client.email,
+          client: {
+            name: project.client.name,
+            email: project.client.email
+          },
+          project: {
+            id: project.id,
+            projectType: project.projectType,
+            bookingMonth: project.bookingMonth,
+            totalPrice: project.totalPrice
+          }
+        });
+        
+        emailSent = true;
+        console.log('✅ Decline email sent successfully');
+      } else {
+        console.warn('⚠️ No client email found - cannot send decline email');
+        emailError = 'Client email not available';
+      }
+    } catch (emailSendError) {
+      console.error('❌ Email sending failed:', emailSendError.message);
+      emailError = emailSendError.message;
     }
 
     res.json({ 
@@ -535,7 +552,7 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
   }
 });
 
-// 🎯 FIXED APPROVE ROUTE WITH EMAIL - Replace your existing approve route
+// 🎯 FIXED APPROVE ROUTE WITH EMAIL
 app.post('/api/bookings/:id/approve', async (req, res) => {
   try {
     console.log(`✅ [APPROVE-FIXED] Processing booking ${req.params.id}`);
@@ -800,96 +817,6 @@ app.get('/api/bookings/:id/details', async (req, res) => {
   }
 });
 
-// 🧪 ADD TEST ROUTE TO VERIFY THE FIX
-app.get('/api/bookings/:id/test-status-update', async (req, res) => {
-  try {
-    const projectId = parseInt(req.params.id);
-    
-    if (!Project) {
-      return res.json({ error: 'Project model not available' });
-    }
-
-    const project = await Project.findByPk(projectId);
-    if (!project) {
-      return res.json({ error: 'Project not found' });
-    }
-
-    console.log(`🧪 Testing status update for project ${projectId}`);
-    console.log(`Current status: ${project.status}`);
-
-    // Test each method
-    const results = {
-      projectId: projectId,
-      originalStatus: project.status,
-      methods: {}
-    };
-
-    // Test Method 1: Sequelize update
-    try {
-      const testProject = await Project.findByPk(projectId);
-      await testProject.update({ status: 'test-update' });
-      await testProject.reload();
-      results.methods.sequelizeUpdate = { success: true, status: testProject.status };
-      
-      // Revert
-      await testProject.update({ status: project.status });
-    } catch (error) {
-      results.methods.sequelizeUpdate = { success: false, error: error.message };
-    }
-
-    // Test Method 2: Direct save
-    try {
-      const testProject = await Project.findByPk(projectId);
-      testProject.status = 'test-save';
-      await testProject.save();
-      results.methods.directSave = { success: true, status: testProject.status };
-      
-      // Revert
-      testProject.status = project.status;
-      await testProject.save();
-    } catch (error) {
-      results.methods.directSave = { success: false, error: error.message };
-    }
-
-    // Test Method 3: Raw SQL
-    try {
-      await sequelize.query(
-        'UPDATE projects SET status = :status WHERE id = :id',
-        {
-          replacements: { status: 'test-sql', id: projectId },
-          type: sequelize.QueryTypes.UPDATE
-        }
-      );
-      
-      const [check] = await sequelize.query(
-        'SELECT status FROM projects WHERE id = :id',
-        {
-          replacements: { id: projectId },
-          type: sequelize.QueryTypes.SELECT
-        }
-      );
-      
-      results.methods.rawSQL = { success: true, status: check.status };
-      
-      // Revert
-      await sequelize.query(
-        'UPDATE projects SET status = :status WHERE id = :id',
-        {
-          replacements: { status: project.status, id: projectId },
-          type: sequelize.QueryTypes.UPDATE
-        }
-      );
-    } catch (error) {
-      results.methods.rawSQL = { success: false, error: error.message };
-    }
-
-    res.json(results);
-
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // ✅ TEST THE ROUTES
 app.get('/api/bookings/:id/test', async (req, res) => {
   try {
@@ -980,40 +907,7 @@ app.get('/', (req, res) => {
       '/api/payments/webhook',
       '/api/payments/status/:paymentId',
       '/api/payments/test-stripe'
-    ],
-    routeCategories: {
-      public: [
-        '/api/health',
-        '/api/test',
-        '/api/bookings',
-        '/api/bookings/availability/:month'
-      ],
-      admin: [
-        '/api/admin/login',
-        '/api/admin/verify',
-        '/api/admin/inquiries',
-        '/api/admin/inquiries/:id/status',
-        '/api/admin/stats',
-        '/api/bookings/:id/approve',
-        '/api/bookings/:id/decline'
-      ],
-      clients: [
-        '/api/clients',
-        '/api/clients/:id'
-      ],
-      payments: [
-        '/api/payments/create-intent',
-        '/api/payments/confirm',
-        '/api/payments/webhook',
-        '/api/payments/status/:paymentId',
-        '/api/payments/test-stripe'
-      ],
-      testing: [
-        '/api/bookings/test',
-        '/api/bookings/debug',
-        '/api/bookings/:id/test'
-      ]
-    }
+    ]
   });
 });
 
@@ -1123,6 +1017,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('  GET  /api/admin/stats');
   console.log('  GET  /api/clients');
   console.log('  POST /api/payments/create-intent');
+  console.log('  POST /api/test/email');
   console.log('🎉 Server ready to receive requests!');
 });
 
