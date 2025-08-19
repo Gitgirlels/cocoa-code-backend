@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const emailService = require('../services/emailService'); // adjust path if needed
+
 
 // SIMPLIFIED: Import models with error handling
 let Client, Project;
@@ -136,7 +138,13 @@ router.post('/', async (req, res) => {
     let emailSent = false;
     try {
       const { sendBookingConfirmation } = require('../services/emailService');
-      await sendBookingConfirmation(project, client);
+      await emailService.sendBookingConfirmation({
+        to: client.email,              // ✅ required
+        client,                        // { name, email, ... }
+        project,                       // { id, projectType, totalPrice, bookingMonth, ... }
+        projectSpecs: project.specifications // or whatever field holds the specs text
+      });
+      
       emailSent = true;
       console.log('✅ Booking confirmation email sent');
     } catch (emailError) {
@@ -309,7 +317,12 @@ router.post('/:id/approve', async (req, res) => {
         const client = await Client.findByPk(project.clientId);
         if (client) {
           const { sendApprovalEmail } = require('../services/emailService');
-          await sendApprovalEmail(project, client);
+          await emailService.sendApprovalEmail({
+            to: client.email,
+            client,
+            project
+          });
+          
           console.log('✅ Approval email sent');
         }
       }
@@ -437,7 +450,12 @@ router.post('/:id/decline', async (req, res) => {
         const client = await Client.findByPk(project.clientId);
         if (client) {
           const { sendDeclineEmail } = require('../services/emailService');
-          await sendDeclineEmail(client);
+          await emailService.sendDeclineEmail({
+            to: client.email,
+            client,
+            project
+          });
+          
           console.log('📩 Decline email sent');
         }
       }

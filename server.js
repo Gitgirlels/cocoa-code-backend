@@ -230,20 +230,13 @@ console.log('- Client email:', client.email);
 console.log('- Client object:', client);
 console.log('- Project ID:', project.id);
   // ✅ CORRECT: Call with proper parameters INCLUDING 'to' field
-  await sendBookingConfirmation({
-    to: client.email,  // ← This was missing!
-    client: {
-      name: client.name,
-      email: client.email
-    },
-    project: {
-      id: project.id,
-      projectType: project.projectType,
-      totalPrice: project.totalPrice,
-      bookingMonth: project.bookingMonth
-    },
-    projectSpecs: project.specifications
+  await emailService.sendBookingConfirmation({
+    to: client.email,              // ✅ required
+    client,                        // { name, email, ... }
+    project,                       // { id, projectType, totalPrice, bookingMonth, ... }
+    projectSpecs: project.specifications // or whatever field holds the specs text
   });
+  
   
   emailSent = true;
   console.log('✅ Booking confirmation email sent successfully');
@@ -512,19 +505,12 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
         const { sendDeclineEmail } = require('./services/emailService');
         
         // ✅ CORRECT: Call sendDeclineEmail (not sendBookingConfirmation)
-        await sendDeclineEmail({
-          to: project.client.email,
-          client: {
-            name: project.client.name,
-            email: project.client.email
-          },
-          project: {
-            id: project.id,
-            projectType: project.projectType,
-            bookingMonth: project.bookingMonth,
-            totalPrice: project.totalPrice
-          }
+        await emailService.sendDeclineEmail({
+          to: client.email,
+          client,
+          project
         });
+        
         
         emailSent = true;
         console.log('✅ Decline email sent successfully');
@@ -676,21 +662,12 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
         const { sendApprovalEmail } = require('./services/emailService');
         
         // Call the email service with proper parameters
-        await sendApprovalEmail({
-          to: project.client.email,
-          client: {
-            name: project.client.name,
-            email: project.client.email
-          },
-          project: {
-            id: project.id,
-            projectType: project.projectType,
-            bookingMonth: project.bookingMonth,
-            totalPrice: project.totalPrice,
-            projectSpecs: project.specifications
-          },
-          projectSpecs: project.specifications
+        await emailService.sendApprovalEmail({
+          to: client.email,
+          client,
+          project
         });
+        
         
         emailSent = true;
         console.log('✅ Approval email sent successfully');
