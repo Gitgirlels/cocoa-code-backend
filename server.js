@@ -220,32 +220,37 @@ app.post('/api/bookings', async (req, res) => {
         console.log('✅ Project saved to database:', project.id);
         
         // ✅ FIXED: Try to send booking confirmation email
-        let emailSent = false;
-        try {
-          const { sendBookingConfirmation } = require('./services/emailService');
-          
-          // ✅ CORRECT: Call with proper parameters
-          await sendBookingConfirmation({
-            to: client.email,
-            client: {
-              name: client.name,
-              email: client.email
-            },
-            project: {
-              id: project.id,
-              projectType: project.projectType,
-              totalPrice: project.totalPrice,
-              bookingMonth: project.bookingMonth
-            },
-            projectSpecs: project.specifications
-          });
-          
-          emailSent = true;
-          console.log('✅ Booking confirmation email sent successfully');
-        } catch (emailError) {
-          console.error('❌ Email sending failed:', emailError.message);
-          console.error('Email error details:', emailError);
-        }
+let emailSent = false;
+try {
+  const { sendBookingConfirmation } = require('./services/emailService');
+  
+  console.log(`📧 Attempting to send email to: ${client.email}`); // Debug log
+  console.log('📧 Debug email data:');
+console.log('- Client email:', client.email);
+console.log('- Client object:', client);
+console.log('- Project ID:', project.id);
+  // ✅ CORRECT: Call with proper parameters INCLUDING 'to' field
+  await sendBookingConfirmation({
+    to: client.email,  // ← This was missing!
+    client: {
+      name: client.name,
+      email: client.email
+    },
+    project: {
+      id: project.id,
+      projectType: project.projectType,
+      totalPrice: project.totalPrice,
+      bookingMonth: project.bookingMonth
+    },
+    projectSpecs: project.specifications
+  });
+  
+  emailSent = true;
+  console.log('✅ Booking confirmation email sent successfully');
+} catch (emailError) {
+  console.error('❌ Email sending failed:', emailError.message);
+  console.error('Email error details:', emailError);
+}
         
         return res.status(201).json({
           message: 'Booking created successfully and saved to database!',
