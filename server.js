@@ -1,3 +1,5 @@
+const { sendDeclineEmail, sendApprovalEmail } = require('./services/emailService');
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -392,155 +394,61 @@ app.get('/api/bookings/debug', async (req, res) => {
   }
 });
 
-// ✅ FIXED DECLINE ROUTE WITH PROPER EMAIL
 app.post('/api/bookings/:id/decline', async (req, res) => {
   try {
-    console.log(`❌ [DECLINE-FIXED] Processing booking ${req.params.id}`);
+    console.log(`Declining booking ${req.params.id}`);
     
     const projectId = parseInt(req.params.id);
-    if (isNaN(projectId) || projectId <= 0) {
-      return res.status(400).json({ 
-        error: 'Invalid booking ID',
-        received: req.params.id,
-        parsed: projectId
-      });
+    if (isNaN(projectId)) {
+      return res.status(400).json({ error: 'Invalid booking ID' });
     }
 
     if (!Project) {
-      return res.status(500).json({ 
-        error: 'Database models not available' 
-      });
+      return res.status(500).json({ error: 'Database not available' });
     }
 
-    // Find the project with client data
-    let project;
-    try {
-      project = await Project.findByPk(projectId, {
-        include: [{ model: Client, as: 'client' }]
-      });
-    } catch (findError) {
-      console.error('❌ Find error:', findError.message);
-      return res.status(500).json({ 
-        error: 'Database find failed',
-        details: findError.message 
-      });
-    }
-    
-    if (!project) {
-      return res.status(404).json({ 
-        error: 'Booking not found',
-        id: projectId
-      });
-    }
-
-    console.log(`📋 Current project status: ${project.status}`);
-
-    // 🎯 TRY MULTIPLE UPDATE METHODS
-    let updateSuccess = false;
-    let finalStatus = null;
-
-    // Method 1: Standard Sequelize update
-    try {
-      await project.update({ status: 'declined' });
-      await project.reload();
-      finalStatus = project.status;
-      updateSuccess = true;
-      console.log('✅ Method 1 (Sequelize update) succeeded');
-    } catch (updateError1) {
-      console.warn('⚠️ Method 1 failed:', updateError1.message);
-      
-      // Method 2: Direct property update + save
-      try {
-        project.status = 'declined';
-        await project.save();
-        finalStatus = project.status;
-        updateSuccess = true;
-        console.log('✅ Method 2 (direct save) succeeded');
-      } catch (updateError2) {
-        console.warn('⚠️ Method 2 failed:', updateError2.message);
-        
-        // Method 3: Raw SQL update as last resort
-        try {
-          await sequelize.query(
-            'UPDATE projects SET status = :status WHERE id = :id',
-            {
-              replacements: { status: 'declined', id: projectId },
-              type: sequelize.QueryTypes.UPDATE
-            }
-          );
-          
-          // Verify the update worked
-          const [results] = await sequelize.query(
-            'SELECT status FROM projects WHERE id = :id',
-            {
-              replacements: { id: projectId },
-              type: sequelize.QueryTypes.SELECT
-            }
-          );
-          
-          if (results && results.status === 'declined') {
-            finalStatus = 'declined';
-            updateSuccess = true;
-            console.log('✅ Method 3 (raw SQL) succeeded');
-          }
-        } catch (updateError3) {
-          console.error('❌ All update methods failed:', updateError3.message);
-        }
-      }
-    }
-
-    if (!updateSuccess) {
-      return res.status(500).json({ 
-        error: 'Failed to update booking status',
-        details: 'All update methods failed',
-        currentStatus: project.status,
-        emailSent: false
-      });
-    }
-
-    console.log(`🎉 Booking ${projectId} successfully declined. Status: ${finalStatus}`);
-
-  // 📧 TRY TO SEND DECLINE EMAIL - FIXED
-let emailSent = false;
-let emailError = null;
-
-try {
-  if (project.client && project.client.email) {
-    console.log(`📧 Sending decline email to: ${project.client.email}`);
-    
-    await sendDeclineEmail({
-      to: project.client.email,     // FIXED: Use project.client.email
-      client: project.client,       // FIXED: Use project.client
-      project: project
+    // Find project with client
+    const project = await Project.findByPk(projectId, {
+      include: [{ model: Client, as: 'client' }]
     });
     
-    emailSent = true;
-    console.log('✅ Decline email sent successfully');
-  } else {
-    console.warn('⚠️ No client email found - cannot send decline email');
-    emailError = 'Client email not available';
-  }
-} catch (emailSendError) {
-  console.error('❌ Email sending failed:', emailSendError.message);
-  emailError = emailSendError.message;
-}
+    if (!project) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Update status
+    await project.update({ status: 'declined' });
+    console.log(`Booking ${projectId} declined successfully`);
+
+    // Send email
+    let emailSent = false;
+    try {
+      if (project.client && project.client.email) {
+        await sendDeclineEmail({
+          to: project.client.email,
+          client: project.client,
+          project: project
+        });
+        emailSent = true;
+        console.log('Decline email sent');
+      }
+    } catch (emailError) {
+      console.error('Email failed:', emailError.message);
+    }
 
     res.json({ 
       success: true, 
       message: 'Booking declined successfully',
       projectId: projectId,
-      status: finalStatus,
-      emailSent: emailSent,
-      emailError: emailError,
-      method: updateSuccess ? 'database_updated' : 'unknown'
+      status: 'declined',
+      emailSent: emailSent
     });
 
   } catch (error) {
-    console.error('❌ [DECLINE-FIXED] Critical error:', error);
+    console.error('Decline error:', error);
     res.status(500).json({ 
-      error: 'Critical system error',
-      details: error.message,
-      emailSent: false
+      error: 'Failed to decline booking',
+      details: error.message 
     });
   }
 });
