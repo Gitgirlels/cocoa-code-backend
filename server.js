@@ -207,14 +207,15 @@ app.post('/api/bookings', async (req, res) => {
           clientId: client.id,
           projectType: projectType || 'custom',
           specifications: projectSpecs || 'No specifications provided',
-          websiteType: 'other',
-          primaryColor: '#8B4513',
-          secondaryColor: '#D2B48C', 
-          accentColor: '#CD853F',
-          basePrice: 0,
-          totalPrice: 0,
+          websiteType: websiteType || 'other',
+          primaryColor: primaryColor || '#8B4513',
+          secondaryColor: secondaryColor || '#D2B48C', 
+          accentColor: accentColor || '#CD853F',
+          basePrice: parseFloat(basePrice) || 0,
+          totalPrice: parseFloat(totalPrice) || 0,
           bookingMonth: bookingMonth || null,
-          status: 'pending'
+          status: 'pending',
+          items: req.body.items || []
         });
         
         console.log('✅ Project saved to database:', project.id);
@@ -354,17 +355,21 @@ app.get('/api/bookings/debug', async (req, res) => {
       id: p.id,
       projectType: p.projectType,
       client: p.client ? {
-        name: p.client.name,
-        email: p.client.email
+          name: p.client.name,
+          email: p.client.email
       } : { name: 'Unknown', email: 'Unknown' },
       status: p.status,
       bookingMonth: p.bookingMonth,
       totalPrice: p.totalPrice,
-      projectSpecs: p.specifications, // ✅ INCLUDE PROJECT SPECS
-      specifications: p.specifications, // ✅ BACKUP FIELD
-      items: p.items || [], // ✅ INCLUDE ITEMS IF AVAILABLE
+      projectSpecs: p.specifications,
+      specifications: p.specifications,
+      items: p.items || [],
+      // ADD THESE LINES:
+      primaryColor: p.primaryColor,
+      secondaryColor: p.secondaryColor,
+      accentColor: p.accentColor,
       createdAt: p.createdAt
-    }));
+  }));
     
     res.json({
       totalProjects: projects.length,
