@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -499,34 +500,30 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
 
     console.log(`🎉 Booking ${projectId} successfully declined. Status: ${finalStatus}`);
 
-    // 📧 TRY TO SEND DECLINE EMAIL - FIXED
-    let emailSent = false;
-    let emailError = null;
+  // 📧 TRY TO SEND DECLINE EMAIL - FIXED
+let emailSent = false;
+let emailError = null;
 
-    try {
-      if (project.client && project.client.email) {
-        console.log(`📧 Sending decline email to: ${project.client.email}`);
-        
-        const { sendDeclineEmail } = require('./services/emailService');
-        
-        // ✅ CORRECT: Call sendDeclineEmail (not sendBookingConfirmation)
-        await sendDeclineEmail({
-          to: client.email,
-          client,
-          project
-        });
-        
-        
-        emailSent = true;
-        console.log('✅ Decline email sent successfully');
-      } else {
-        console.warn('⚠️ No client email found - cannot send decline email');
-        emailError = 'Client email not available';
-      }
-    } catch (emailSendError) {
-      console.error('❌ Email sending failed:', emailSendError.message);
-      emailError = emailSendError.message;
-    }
+try {
+  if (project.client && project.client.email) {
+    console.log(`📧 Sending decline email to: ${project.client.email}`);
+    
+    await sendDeclineEmail({
+      to: project.client.email,     // FIXED: Use project.client.email
+      client: project.client,       // FIXED: Use project.client
+      project: project
+    });
+    
+    emailSent = true;
+    console.log('✅ Decline email sent successfully');
+  } else {
+    console.warn('⚠️ No client email found - cannot send decline email');
+    emailError = 'Client email not available';
+  }
+} catch (emailSendError) {
+  console.error('❌ Email sending failed:', emailSendError.message);
+  emailError = emailSendError.message;
+}
 
     res.json({ 
       success: true, 
@@ -668,11 +665,10 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
         
         // Call the email service with proper parameters
         await sendApprovalEmail({
-          to: client.email,
-          client,
-          project
+          to: project.client.email,     // FIXED: Use project.client.email
+          client: project.client,       // FIXED: Use project.client  
+          project: project
         });
-        
         
         emailSent = true;
         console.log('✅ Approval email sent successfully');
