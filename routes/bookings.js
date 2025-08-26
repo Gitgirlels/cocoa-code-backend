@@ -110,20 +110,19 @@ router.post('/', async (req, res) => {
     try {
       const projectData = {
         clientId: client.id,
-        projectType: projectType || 'service-only',
-        specifications: projectSpecs || 'No specifications provided',
-        websiteType: websiteType || 'other',
-        primaryColor: primaryColor || '#8B4513',
-        secondaryColor: secondaryColor || '#D2B48C',
-        accentColor: accentColor || '#CD853F',
-        basePrice: parseFloat(basePrice) || 0,
-        totalPrice: parseFloat(totalPrice) || 0,
-        bookingMonth: bookingMonth || null,
-        status: 'pending',
-        items: JSON.stringify(req.body.items || []), // Save items as JSON string
-        // Store encrypted payment token (in production, use proper encryption)
-        paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
-      };
+    projectType: projectType || 'custom',
+    specifications: projectSpecs || 'No specifications provided',
+    websiteType: websiteType || 'other',
+    primaryColor: primaryColor || '#8B4513',
+    secondaryColor: secondaryColor || '#D2B48C', 
+    accentColor: accentColor || '#CD853F',
+    basePrice: parseFloat(basePrice) || 0,
+    totalPrice: parseFloat(totalPrice) || 0,
+    bookingMonth: bookingMonth || null,
+    status: 'pending',
+    items: req.body.items || [],
+    subscription: req.body.subscription || 'basic' // Add this line
+};
 
       project = await Project.create(projectData);
       console.log('✅ Project created successfully:', project.id);
@@ -513,17 +512,21 @@ router.get('/debug', async (req, res) => {
       id: p.id,
       projectType: p.projectType,
       client: p.client ? {
-        name: p.client.name,
-        email: p.client.email
+          name: p.client.name,
+          email: p.client.email
       } : { name: 'Unknown', email: 'Unknown' },
       status: p.status,
       bookingMonth: p.bookingMonth,
       totalPrice: p.totalPrice,
-      projectSpecs: p.specifications, // ✅ INCLUDE PROJECT SPECS
-      specifications: p.specifications, // ✅ BACKUP FIELD
-      items: p.items || [], // ✅ INCLUDE ITEMS IF AVAILABLE
+      projectSpecs: p.specifications,
+      specifications: p.specifications,
+      items: p.items || [],
+      primaryColor: p.primaryColor,
+      secondaryColor: p.secondaryColor,
+      accentColor: p.accentColor,
+      subscription: p.subscription, // Add this line
       createdAt: p.createdAt
-    }));
+  }));
     
     res.json({
       totalProjects: projects.length,
