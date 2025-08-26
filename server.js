@@ -231,7 +231,7 @@ console.log('- Client email:', client.email);
 console.log('- Client object:', client);
 console.log('- Project ID:', project.id);
   // ✅ CORRECT: Call with proper parameters INCLUDING 'to' field
-  await emailService.sendBookingConfirmation({
+  await sendBookingConfirmation({
     to: client.email,              // ✅ required
     client,                        // { name, email, ... }
     project,                       // { id, projectType, totalPrice, bookingMonth, ... }
@@ -510,7 +510,7 @@ app.post('/api/bookings/:id/decline', async (req, res) => {
         const { sendDeclineEmail } = require('./services/emailService');
         
         // ✅ CORRECT: Call sendDeclineEmail (not sendBookingConfirmation)
-        await emailService.sendDeclineEmail({
+        await sendDeclineEmail({
           to: client.email,
           client,
           project
@@ -667,7 +667,7 @@ app.post('/api/bookings/:id/approve', async (req, res) => {
         const { sendApprovalEmail } = require('./services/emailService');
         
         // Call the email service with proper parameters
-        await emailService.sendApprovalEmail({
+        await sendApprovalEmail({
           to: client.email,
           client,
           project
