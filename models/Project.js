@@ -70,7 +70,18 @@ module.exports = (sequelize, DataTypes) => {
       bookingMonth: {
         type: DataTypes.STRING,
         allowNull: true
-      }
+      },
+      items: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        get() {
+            const value = this.getDataValue('items');
+            return value ? JSON.parse(value) : [];
+        },
+        set(value) {
+            this.setDataValue('items', JSON.stringify(value || []));
+        }
+    }
     }, {
       tableName: 'projects',
       timestamps: true,

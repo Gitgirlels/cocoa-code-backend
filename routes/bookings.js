@@ -120,6 +120,7 @@ router.post('/', async (req, res) => {
         totalPrice: parseFloat(totalPrice) || 0,
         bookingMonth: bookingMonth || null,
         status: 'pending',
+        items: JSON.stringify(req.body.items || []), // Save items as JSON string
         // Store encrypted payment token (in production, use proper encryption)
         paymentToken: req.body.paymentDetails ? 'CARD_SAVED_' + Date.now() : null
       };
